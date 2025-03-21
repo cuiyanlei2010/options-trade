@@ -73,12 +73,12 @@ public class OwnerManager {
 
         List<OwnerStrategy> strategyList = ownerObj.getStrategyList();
         List<OwnerOrder> ownerOrderList = new ArrayList<>();
-        log.info("查询策略订单");
+        log.warn("查询策略订单");
         strategyList.parallelStream().forEach(strategy -> {
             List<OwnerOrder> orders = queryStrategyOrder(strategy);
             ownerOrderList.addAll(orders);
         });
-        log.info("查询策略订单jieshu");
+        log.warn("查询策略订单jieshu");
         // 过滤出到期未行权的订单
         List<OwnerOrder> unexercisedOrders = ownerOrderList.stream()
                 .filter(order -> !order.getCode().equals(order.getUnderlyingCode())) // 是期权订单
