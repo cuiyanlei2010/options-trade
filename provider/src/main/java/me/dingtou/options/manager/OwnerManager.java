@@ -201,8 +201,11 @@ public class OwnerManager {
                 ownerOrder.setExt(new HashMap<>());
             }
         }
+        log.warn("查询策略基础"+ strategy.getStrategyId());
         calculateBasic(strategy, ownerOrders);
+        log.warn("查询策略基础结束"+ strategy.getStrategyId());
         calculateProfit(ownerOrders);
+        log.warn("计算收益结束"+ strategy.getStrategyId());
 
         return ownerOrders;
     }
