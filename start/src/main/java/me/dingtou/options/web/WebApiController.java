@@ -4,11 +4,16 @@ import com.alibaba.fastjson.JSON;
 import lombok.extern.slf4j.Slf4j;
 import me.dingtou.options.constant.OrderAction;
 import me.dingtou.options.constant.TradeSide;
+import me.dingtou.options.job.JobClient;
+import me.dingtou.options.job.JobContext;
+import me.dingtou.options.job.background.CloseOrderJob;
+import me.dingtou.options.job.background.CloseOrderJob.CloseOrderJobArgs;
 import me.dingtou.options.model.*;
 import me.dingtou.options.service.AuthService;
 import me.dingtou.options.service.OptionsQueryService;
 import me.dingtou.options.service.OptionsTradeService;
 import me.dingtou.options.service.SummaryService;
+import me.dingtou.options.web.model.CloseOrderJobReq;
 import me.dingtou.options.web.model.WebResult;
 import me.dingtou.options.web.util.SessionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -19,9 +24,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * API 控制器
@@ -166,18 +176,44 @@ public class WebApiController {
             @RequestParam(value = "quantity", required = true) Integer quantity,
             @RequestParam(value = "price", required = true) String price,
             @RequestParam(value = "options", required = true) String options,
+            @RequestParam(value = "closeOrderJob", required = false) String closeOrderJob,
             @RequestParam(value = "password", required = true) String password) throws Exception {
 
         String owner = SessionUtils.getCurrentOwner();
-        log.info("trade submit. owner:{}, side:{}, quantity:{}, price:{}, options:{}", owner, side, quantity, price,
-                options);
+        log.info("trade submit. owner:{}, side:{}, quantity:{}, price:{}, options:{}, closeOrderJob:{}",
+                owner, side, quantity, price, options, closeOrderJob);
         if (!authService.auth(owner, password)) {
             return WebResult.failure("验证码错误");
         }
         Options optionsObj = JSON.parseObject(options, Options.class);
         BigDecimal sellPrice = new BigDecimal(price);
-        return WebResult
-                .success(optionsTradeService.submit(strategyId, TradeSide.of(side), quantity, sellPrice, optionsObj));
+
+        OwnerOrder order = optionsTradeService.submit(strategyId, TradeSide.of(side), quantity, sellPrice, optionsObj);
+        if (null == order || null == order.getId()) {
+            return WebResult.failure("下单失败");
+        }
+
+        // 解析平仓单请求
+        CloseOrderJobReq closeOrderJobReq = null;
+        if (StringUtils.isNotEmpty(closeOrderJob)) {
+            closeOrderJobReq = JSON.parseObject(closeOrderJob, CloseOrderJobReq.class);
+            closeOrderJobReq.setOrderId(order.getId());
+            log.info("close order job req:{}", closeOrderJobReq);
+            if (closeOrderJobReq.getEnabled()) {
+                CloseOrderJobArgs args = new CloseOrderJobArgs();
+                String jobId = String.format("close-%s", order.getId());
+                args.setJobId(UUID.nameUUIDFromBytes(jobId.getBytes(StandardCharsets.UTF_8)));
+                args.setOwner(owner);
+                args.setOrderId(order.getId());
+                args.setPrice(closeOrderJobReq.getPrice());
+                args.setCannelTime(closeOrderJobReq.getCannelTime());
+                // 默认600秒后执行
+                Instant executeTime = Instant.now().plus(Duration.ofSeconds(600));
+                JobClient.submit(args.getJobId(), new CloseOrderJob(), JobContext.of(args), executeTime);
+            }
+        }
+
+        return WebResult.success(order);
     }
 
     @RequestMapping(value = "/trade/order/draft", method = RequestMethod.GET)
@@ -193,36 +229,28 @@ public class WebApiController {
 
     @RequestMapping(value = "/trade/close", method = RequestMethod.POST)
     public WebResult<OwnerOrder> close(@RequestParam(value = "price", required = true) String price,
-            @RequestParam(value = "order", required = true) String order,
-            @RequestParam(value = "password", required = true) String password) throws Exception {
+            @RequestParam(value = "orderId", required = true) Long orderId,
+            @RequestParam(value = "password", required = true) String password,
+            @RequestParam(value = "cannelTime", required = false) Date cannelTime) throws Exception {
         String owner = SessionUtils.getCurrentOwner();
-        log.info("trade close. owner:{}, price:{}, order:{}", owner, price, order);
+        log.info("trade close. owner:{}, price:{}, orderId:{}", owner, price, orderId);
         if (!authService.auth(owner, password)) {
             return WebResult.failure("验证码错误");
         }
-        OwnerOrder orderObj = JSON.parseObject(order, OwnerOrder.class);
-        String loginOwner = SessionUtils.getCurrentOwner();
-        if (!loginOwner.equals(orderObj.getOwner())) {
-            return WebResult.failure("账号信息错误");
-        }
-        return WebResult.success(optionsTradeService.close(orderObj, new BigDecimal(price)));
+        return WebResult.success(optionsTradeService.close(owner, orderId, new BigDecimal(price), cannelTime));
     }
 
     @RequestMapping(value = "/trade/modify", method = RequestMethod.POST)
     public WebResult<OwnerOrder> modify(@RequestParam(value = "action", required = true) String action,
-            @RequestParam(value = "order", required = true) String order,
+            @RequestParam(value = "orderId", required = true) Long orderId,
             @RequestParam(value = "password", required = true) String password) throws Exception {
         String owner = SessionUtils.getCurrentOwner();
-        log.info("trade modify. owner:{}, action:{}, order:{}", owner, action, order);
+        log.info("trade modify. owner:{}, action:{}, orderId:{}", owner, action, orderId);
         if (!authService.auth(owner, password)) {
             return WebResult.failure("验证码错误");
         }
         OrderAction orderAction = OrderAction.of(action);
-        OwnerOrder orderObj = JSON.parseObject(order, OwnerOrder.class);
-        if (!owner.equals(orderObj.getOwner())) {
-            return WebResult.failure("订单Owner不匹配");
-        }
-        return WebResult.success(optionsTradeService.modify(orderObj, orderAction));
+        return WebResult.success(optionsTradeService.modify(owner, orderId, orderAction));
     }
 
     @RequestMapping(value = "/trade/sync", method = RequestMethod.GET)

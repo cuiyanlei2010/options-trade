@@ -271,7 +271,7 @@ function loadOptionsChain(strikeTime, strikeTimestamp, optionExpiryDateDistance)
                   return d.strikePrice;
               }},
               {field: 'range', title: '涨跌幅', width: 80},
-              {field: 'curPrice', title: '价格', width: 80},
+              {field: 'curPrice', title: '当前价格', width: 110},
               {field: 'sellAnnualYield', title: '年化', width: 80},
               {title: '交易参考信息', width: 480, templet: '#TPL-table-tradeInfo'},
               {field: 'group', title: '分组', width: 80},
@@ -302,10 +302,8 @@ function loadOptionsChain(strikeTime, strikeTimestamp, optionExpiryDateDistance)
                     var type = $(this).find('td[data-field="type"]').text();
                     if (type.indexOf('Call') > -1) {
                         $(this).addClass('layui-table-call');
-                        $(this).attr('data-option-type', 'Call期权');
                     } else if (type.indexOf('Put') > -1) {
                         $(this).addClass('layui-table-put');
-                        $(this).attr('data-option-type', 'Put期权');
                     }
                     
                     // 为价格添加颜色
@@ -347,49 +345,224 @@ function trade(side, options, orderBook){
         layer.msg('请先选择策略！');
         return;
     }
-    var selectStrategyArr = filterStrategyById(currentOwnerData.strategyList, currentStrategyId);
+    // 渲染当前证券策略列表
+    var currentStrategyList = filterStrategyByCode(currentOwnerData.strategyList,currentCode);
+    var selectStrategyArr = filterStrategyById(currentStrategyList, currentStrategyId);
     if(!selectStrategyArr || selectStrategyArr.length != 1){
         layer.msg('无法匹配策略！');
         return;
     }
 
-    layer.confirm('确认交易策略名称：'+selectStrategyArr[0].strategyName, {
-            btn: ['确定', '取消'] //按钮
-          }, function(){
-            // 确认
-            layer.prompt({title: '请输入卖出份数', value: 1}, function(value, index, elem){
-                if(value === ''){
-                    return elem.focus();
+    // 创建表单内容
+    var formContent = `
+        <div class="layui-form" style="padding: 20px;">
+            <div class="layui-form-item">
+                <label class="layui-form-label">交易策略</label>
+                <div class="layui-input-block">
+                    <select name="strategyId" lay-filter="formStrategySelect" lay-verify="required">
+                        ${currentStrategyList.map(strategy => `<option value="${strategy.strategyId}" ${strategy.strategyId === currentStrategyId ? 'selected' : ''}>${strategy.strategyName}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">期权代码</label>
+                <div class="layui-input-block">
+                    <input type="text" class="layui-input layui-bg-gray" value="${options.basic.security.code}" readonly>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">行权价</label>
+                <div class="layui-input-block">
+                    <input type="text" class="layui-input layui-bg-gray" value="${options.optionExData ? options.optionExData.strikePrice : '-'}" readonly>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">当前价格</label>
+                <div class="layui-input-block">
+                    <input type="text" class="layui-input layui-bg-gray" value="${options.realtimeData ? options.realtimeData.curPrice : '-'}" readonly>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <div class="layui-inline" style="margin-right: 0;">
+                    <label class="layui-form-label">Ask价</label>
+                    <div class="layui-input-inline" style="width: 100px;">
+                        <input type="text" class="layui-input layui-bg-gray" value="${orderBook.askList}" readonly>
+                    </div>
+                </div>
+                <div class="layui-inline">
+                    <label class="layui-form-label" style="width: 80px;">Bid价</label>
+                    <div class="layui-input-inline" style="width: 100px;">
+                        <input type="text" class="layui-input layui-bg-gray" value="${orderBook.bidList}" readonly>
+                    </div>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">卖出份数</label>
+                <div class="layui-input-block">
+                    <input type="number" name="quantity" class="layui-input" value="1" min="1">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">卖出价格</label>
+                <div class="layui-input-block">
+                    <input type="number" name="price" class="layui-input" value="${options.realtimeData.curPrice}" step="0.01">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">创建平仓单</label>
+                <div class="layui-input-block">
+                    <input type="checkbox" name="closeOrderEnabled" lay-skin="switch" lay-text="是|否" lay-filter="toggleCloseOrder">
+                </div>
+            </div>
+            <div class="layui-form-item" id="closeOrderTimeItem" style="display:none;">
+                <label class="layui-form-label">截止时间</label>
+                <div class="layui-input-block">
+                    <input type="text" name="closeOrderTime" id="closeOrderTime" class="layui-input" placeholder="选择平仓单截止时间">
+                </div>
+            </div>
+            <div class="layui-form-item" id="closeOrderProfitRatioItem" style="display:none;">
+                <label class="layui-form-label">盈利比例</label>
+                <div class="layui-input-block">
+                    <div class="layui-input-inline" style="width: 60px;">
+                        <input type="number" name="closeOrderProfitRatio" id="closeOrderProfitRatio" class="layui-input" value="80" min="0" max="100">
+                    </div>
+                    <div class="layui-form-mid layui-word-aux">%</div>
+                </div>
+            </div>
+            <div class="layui-form-item" id="closeOrderPriceItem" style="display:none;">
+                <label class="layui-form-label">平仓价格</label>
+                <div class="layui-input-block">
+                    <input type="number" name="closeOrderPrice" id="closeOrderPrice" class="layui-input" value="" step="0.01">
+                </div>
+            </div>
+        </div>
+    `;
+
+    layer.open({
+        type: 1,
+        title: '确认卖出期权',
+        area: ['500px', '650px'],
+        content: formContent,
+        btn: ['确认卖出', '取消'],
+        success: function(layero, index) {
+            // 渲染日期选择器
+            layui.laydate.render({
+                elem: '#closeOrderTime',
+                type: 'datetime',
+                min: 0,
+                format: 'yyyy-MM-dd HH:mm:ss'
+            });
+            
+            // 监听开关切换事件
+            layui.form.on('switch(toggleCloseOrder)', function(data){
+                var closeOrderTimeItem = layero.find('#closeOrderTimeItem');
+                var closeOrderProfitRatioItem = layero.find('#closeOrderProfitRatioItem');
+                var closeOrderPriceItem = layero.find('#closeOrderPriceItem');
+                if(data.elem.checked) {
+                    closeOrderTimeItem.show();
+                    closeOrderProfitRatioItem.show();
+                    closeOrderPriceItem.show();
+                    
+                    // 初始化价格
+                    updateCloseOrderPrice();
+                } else {
+                    closeOrderTimeItem.hide();
+                    closeOrderProfitRatioItem.hide();
+                    closeOrderPriceItem.hide();
                 }
-                var quantity = util.escape(value);
-                layer.close(index);
-                layer.prompt({title: '请输入卖出价格（ask:'+orderBook.askList+' bid:'+orderBook.bidList+'）', value: options.realtimeData.curPrice}, function(value, index, elem){
-                    if(value === ''){
-                        return elem.focus();
-                    }
-                    // 下单
-                    var price = util.escape(value);
-                    $.ajax({
-                      url: "/trade/submit",
-                      method: 'POST',
-                      data: {
+            });
+            
+            // 监听盈利比例变化
+            var $profitRatio = layero.find('#closeOrderProfitRatio');
+            var $closePrice = layero.find('#closeOrderPrice');
+            var $sellPrice = layero.find('input[name="price"]');
+            
+            function updateCloseOrderPrice() {
+                var ratio = parseFloat($profitRatio.val()) / 100;
+                var sellPrice = parseFloat($sellPrice.val());
+                if (!isNaN(ratio) && !isNaN(sellPrice)) {
+                    // 按照盈利比例计算价格: 卖出价格 * (1-盈利比例)
+                    var calculatedPrice = (sellPrice * (1-ratio)).toFixed(2);
+                    $closePrice.val(calculatedPrice);
+                }
+            }
+            
+            $profitRatio.on('input', updateCloseOrderPrice);
+            // 当卖出价格变化时也更新平仓价格
+            $sellPrice.on('input', updateCloseOrderPrice);
+            
+            // 重新渲染表单元素以激活开关等控件
+            layui.form.render();
+        },
+        yes: function(index, layero) {
+            // 获取表单数据
+            var selectedStrategyId = layero.find('select[name="strategyId"]').val();
+            var quantity = layero.find('input[name="quantity"]').val();
+            var price = layero.find('input[name="price"]').val();
+            var closeOrderEnabled = layero.find('input[name="closeOrderEnabled"]').prop('checked');
+            var closeOrderTime = layero.find('input[name="closeOrderTime"]').val();
+            var closeOrderPrice = layero.find('input[name="closeOrderPrice"]').val();
+            
+            if (!selectedStrategyId) {
+                layer.msg('请选择交易策略');
+                return;
+            }
+            
+            if (!quantity || !price) {
+                layer.msg('请输入份数和价格');
+                return;
+            }
+            
+            if (closeOrderEnabled) {
+                if (!closeOrderTime) {
+                    layer.msg('请选择平仓单截止时间');
+                    return;
+                }
+                
+                if (!closeOrderPrice || closeOrderPrice <= 0) {
+                    layer.msg('请输入有效的平仓价格');
+                    return;
+                }
+            }
+
+            // 二次确认对话框
+            layer.confirm(`确定要使用 <strong>${filterStrategyById(currentOwnerData.strategyList, selectedStrategyId)[0].strategyName}</strong> 策略卖出 <strong>${options.basic.security.code}</strong> 期权吗？`, {
+                icon: 3,
+                title: '策略确认',
+                btn: ['确定卖出','再检查一下']
+            }, function(confirmIndex){
+                // 准备平仓单数据
+                var closeOrderJob = null;
+                if (closeOrderEnabled) {
+                    closeOrderJob = {
+                        enabled: true,
+                        cannelTime: closeOrderTime,
+                        price: closeOrderPrice
+                    };
+                }
+
+                // 下单
+                $.ajax({
+                    url: "/trade/submit",
+                    method: 'POST',
+                    data: {
                         password: $("#totp").val(),
                         side: side,
-                        strategyId: currentStrategyId,
+                        strategyId: selectedStrategyId,
                         quantity: quantity,
                         price: price,
                         options: JSON.stringify(options),
-                      },
-                      success: function( response ) {
+                        closeOrderJob: closeOrderJob ? JSON.stringify(closeOrderJob) : null
+                    },
+                    success: function(response) {
                         layer.msg(response.success ? '操作成功' : response.message);
                         layer.close(index);
-                      }
-                    });
+                        layer.close(confirmIndex);
+                    }
                 });
             });
-       }, function(){
-                // 取消
-       });
+        }
+    });
 }
 
 function sell(options){
@@ -401,8 +574,15 @@ function sell(options){
            market: options.basic.security.market,
            time: new Date().getTime()
          },
-         success: function( response ) {
-            trade(2, options, response.data);
+         success: function(response) {
+            if (response.success) {
+                trade(2, options, response.data);
+            } else {
+                layer.msg(response.message || '获取订单簿失败');
+            }
+         },
+         error: function() {
+            layer.msg('网络错误，请重试');
          }
        });
 }
