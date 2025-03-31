@@ -31,9 +31,8 @@ public class SecurityQuoteGatewayImpl extends BaseLongPortGateway implements Sec
      */
     private static final Cache<Security, SecurityQuote> SECURITY_QUOTE_CACHE = CacheBuilder.newBuilder()
             .maximumSize(1000)
-            .expireAfterWrite(30, TimeUnit.SECONDS)
+            .expireAfterWrite(300, TimeUnit.SECONDS)
             .build();
-
 
     @Override
     public SecurityQuote quote(OwnerAccount ownerAccount, Security security) {
@@ -69,15 +68,20 @@ public class SecurityQuoteGatewayImpl extends BaseLongPortGateway implements Sec
                     symbols.add(security.toString());
                 }
             }
-            CompletableFuture<com.longport.quote.SecurityQuote[]> ctxQuote = ctx.getQuote(symbols.toArray(new String[0]));
+            if (symbols.isEmpty()) {
+                return quoteList;
+            }
+            CompletableFuture<com.longport.quote.SecurityQuote[]> ctxQuote = ctx
+                    .getQuote(symbols.toArray(new String[0]));
             com.longport.quote.SecurityQuote[] securityQuotes = ctxQuote.get(10, TimeUnit.SECONDS);
 
             for (com.longport.quote.SecurityQuote securityQuote : securityQuotes) {
                 if (null == securityQuote) {
                     continue;
                 }
-                quoteList.add(convertSecurityQuote(securityQuote));
-
+                SecurityQuote quote = convertSecurityQuote(securityQuote);
+                quoteList.add(quote);
+                SECURITY_QUOTE_CACHE.put(quote.getSecurity(), quote);
             }
         } catch (Exception e) {
             log.error("quote error. message:{}", e.getMessage(), e);
@@ -92,7 +96,8 @@ public class SecurityQuoteGatewayImpl extends BaseLongPortGateway implements Sec
     }
 
     @Override
-    public void subscribeQuote(OwnerAccount ownerAccount, List<Security> security, Function<SecurityQuote, Void> callback) {
+    public void subscribeQuote(OwnerAccount ownerAccount, List<Security> security,
+            Function<SecurityQuote, Void> callback) {
         try {
             if (null == security || null == callback) {
                 return;

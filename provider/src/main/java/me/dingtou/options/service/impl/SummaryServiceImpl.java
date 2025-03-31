@@ -16,6 +16,7 @@ import me.dingtou.options.constant.AccountExt;
 import me.dingtou.options.constant.OrderStatus;
 import me.dingtou.options.constant.TradeSide;
 import me.dingtou.options.gateway.SecurityQuoteGateway;
+import me.dingtou.options.manager.IndicatorManager;
 import me.dingtou.options.manager.OwnerManager;
 import me.dingtou.options.manager.TradeManager;
 import me.dingtou.options.model.OwnerAccount;
@@ -24,8 +25,12 @@ import me.dingtou.options.model.OwnerStrategy;
 import me.dingtou.options.model.OwnerSummary;
 import me.dingtou.options.model.Security;
 import me.dingtou.options.model.SecurityQuote;
+import me.dingtou.options.model.StockIndicator;
 import me.dingtou.options.model.StrategySummary;
 import me.dingtou.options.service.SummaryService;
+import me.dingtou.options.strategy.OrderTradeStrategy;
+import me.dingtou.options.strategy.order.DefaultOrderTradeStrategy;
+
 import org.springframework.util.CollectionUtils;
 
 @Service
@@ -36,6 +41,9 @@ public class SummaryServiceImpl implements SummaryService {
 
     @Autowired
     private TradeManager tradeManager;
+
+    @Autowired
+    private IndicatorManager indicatorManager;
 
     @Autowired
     private SecurityQuoteGateway securityQuoteGateway;
@@ -58,8 +66,9 @@ public class SummaryServiceImpl implements SummaryService {
             StrategySummary strategySummary = queryStrategySummary(owner, ownerStrategy);
             strategySummaries.add(strategySummary);
         });
-        strategySummaries.stream().filter(summary-> CollectionUtils.isEmpty(summary.getStrategyOrders())).forEach(strategySummaries::remove);
-        // 统计
+        strategySummaries.stream().filter(summary -> CollectionUtils.isEmpty(summary.getStrategyOrders()))
+                .forEach(strategySummaries::remove);
+        // 统计未平仓订单
         List<OwnerOrder> unrealizedOrders = new ArrayList<>();
         for (StrategySummary strategySummary : strategySummaries) {
             if (null == strategySummary.getAllOptionsIncome()) {
@@ -73,6 +82,7 @@ public class SummaryServiceImpl implements SummaryService {
                     .filter(OwnerOrder::isOpen)
                     .forEach(unrealizedOrders::add);
         }
+
         ownerSummary.setAllOptionsIncome(allOptionsIncome);
         ownerSummary.setTotalFee(totalFee);
         ownerSummary.setUnrealizedOptionsIncome(unrealizedOptionsIncome);
@@ -119,7 +129,8 @@ public class SummaryServiceImpl implements SummaryService {
         if (StringUtils.isNotBlank(accountSizeConf) && StringUtils.isNotBlank(marginRatioConf)) {
             BigDecimal accountSize = new BigDecimal(accountSizeConf);
             BigDecimal marginRatio = new BigDecimal(marginRatioConf);
-            BigDecimal positionRatio = StringUtils.isNotBlank(positionRatioConf) ? new BigDecimal(positionRatioConf) : new BigDecimal("0.1");
+            BigDecimal positionRatio = StringUtils.isNotBlank(positionRatioConf) ? new BigDecimal(positionRatioConf)
+                    : new BigDecimal("0.1");
             ownerSummary.setAccountSize(accountSize);
             ownerSummary.setMarginRatio(marginRatio);
             ownerSummary.setPositionRatio(positionRatio);
@@ -141,7 +152,8 @@ public class SummaryServiceImpl implements SummaryService {
             // 计算未平仓订单的头寸占比
             for (OwnerOrder order : ownerSummary.getUnrealizedOrders()) {
                 // 计算订单金额
-                BigDecimal orderAmount = OwnerOrder.strikePrice(order).multiply(new BigDecimal(OwnerOrder.lotSize(order)));
+                BigDecimal orderAmount = OwnerOrder.strikePrice(order)
+                        .multiply(new BigDecimal(OwnerOrder.lotSize(order)));
                 // 计算该订单的头寸占比
                 BigDecimal scaleRatio = orderAmount.divide(accountSize, 4, RoundingMode.HALF_UP);
                 order.getExt().put("scaleRatio", scaleRatio.toString());
@@ -251,13 +263,25 @@ public class SummaryServiceImpl implements SummaryService {
             summary.setPutMarginOccupied(putMarginOccupied);
         }
 
+        // 计算未平仓订单的AI提示
+        List<OwnerOrder> openOrders = ownerOrders.stream()
+                .filter(OwnerOrder::isOpen)
+                .filter(OwnerOrder::isOptionsOrder)
+                .toList();
+        // 未平仓订单处理策略
+        OrderTradeStrategy defaultOrderTradeStrategy = new DefaultOrderTradeStrategy();
+        for (OwnerOrder order : openOrders) {
+            StockIndicator stockIndicator = indicatorManager.calculateStockIndicator(account, security);
+            defaultOrderTradeStrategy.calculate(account, order, stockIndicator);
+        }
+
         return summary;
     }
 
     @Override
     public StrategySummary queryStrategySummary(String owner, String strategyId) {
         OwnerStrategy ownerStrategy = ownerStrategyDAO.queryStrategyByStrategyId(strategyId);
-        if(ownerStrategy.getStatus()==0){
+        if (ownerStrategy.getStatus() == 0) {
             return null;
         }
         return queryStrategySummary(owner, ownerStrategy);
