@@ -87,11 +87,17 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                     }
                 },
                 {
-                    field: 'ext', title: '扩展配置', width: 200, templet: function(d) {
+                    field: 'ext', title: '扩展配置', width: 300, templet: function(d) {
                         var extStr = '';
                         if (d.ext && typeof d.ext === 'object') {
+                            if (d.ext.initial_stock_num) {
+                                extStr += '初始股票数:' + d.ext.initial_stock_num+'; ';
+                            }
+                            if (d.ext.initial_stock_cost) {
+                                extStr += '成本价:' + d.ext.initial_stock_cost+'; ';
+                            }
                             if (d.ext.wheel_sellput_strike_price) {
-                                extStr += 'Sell Put行权价: ' + d.ext.wheel_sellput_strike_price;
+                                extStr += 'SellPut行权价:' + d.ext.wheel_sellput_strike_price+'; ';
                             }
                         }
                         return extStr;
@@ -300,6 +306,16 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                                     $('input[name="sellPutStrikePrice"]').val(data.ext.wheel_sellput_strike_price);
                                 }
                                 
+                                // 处理ext字段中的initial_stock_num
+                                if (data.ext && typeof data.ext === 'object' && data.ext.initial_stock_num) {
+                                    $('input[name="initialStockNum"]').val(data.ext.initial_stock_num);
+                                }
+                                
+                                // 处理ext字段中的initial_stock_cost
+                                if (data.ext && typeof data.ext === 'object' && data.ext.initial_stock_cost) {
+                                    $('input[name="initialStockCost"]').val(data.ext.initial_stock_cost);
+                                }
+                                
                                 // 根据策略代码显示或隐藏特定配置
                                 toggleStrategyConfig(data.strategyCode);
                                 
@@ -331,7 +347,7 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                             // 获取当前表单数据
                             var formData = form.val('strategyForm');
                             
-                            // 如果有ext数据，尝试从中提取wheel_sellput_strike_price
+                            // 如果有ext数据，尝试从中提取wheel_sellput_strike_price和initial_stock_num
                             if (formData.ext) {
                                 var extData;
                                 if (typeof formData.ext === 'string') {
@@ -347,6 +363,14 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                                 
                                 if (extData.wheel_sellput_strike_price) {
                                     $('input[name="sellPutStrikePrice"]').val(extData.wheel_sellput_strike_price);
+                                }
+                                
+                                if (extData.initial_stock_num) {
+                                    $('input[name="initialStockNum"]').val(extData.initial_stock_num);
+                                }
+                                
+                                if (extData.initial_stock_cost) {
+                                    $('input[name="initialStockCost"]').val(extData.initial_stock_cost);
                                 }
                             }
                         } else {
@@ -374,8 +398,20 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                             data.field.ext.wheel_sellput_strike_price = data.field.sellPutStrikePrice;
                         }
                         
+                        // 处理通用配置 - 初始股票数
+                        if (data.field.initialStockNum) {
+                            data.field.ext.initial_stock_num = data.field.initialStockNum;
+                        }
+                        
+                        // 处理通用配置 - 初始股票成本价
+                        if (data.field.initialStockCost) {
+                            data.field.ext.initial_stock_cost = data.field.initialStockCost;
+                        }
+                        
                         // 删除临时字段
                         delete data.field.sellPutStrikePrice;
+                        delete data.field.initialStockNum;
+                        delete data.field.initialStockCost;
                         
                         console.log('提交的数据:', JSON.stringify(data.field));
                         
@@ -551,8 +587,20 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                         data.field.ext.wheel_sellput_strike_price = data.field.sellPutStrikePrice;
                     }
                     
+                    // 处理通用配置 - 初始股票数
+                    if (data.field.initialStockNum) {
+                        data.field.ext.initial_stock_num = data.field.initialStockNum;
+                    }
+                    
+                    // 处理通用配置 - 初始股票成本价
+                    if (data.field.initialStockCost) {
+                        data.field.ext.initial_stock_cost = data.field.initialStockCost;
+                    }
+                    
                     // 删除临时字段
                     delete data.field.sellPutStrikePrice;
+                    delete data.field.initialStockNum;
+                    delete data.field.initialStockCost;
                     
                     console.log('提交的数据:', JSON.stringify(data.field));
                     
@@ -693,8 +741,8 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                         $('#ai_base_url').val(data.ext.ai_base_url || 'https://dashscope.aliyuncs.com/compatible-mode/v1');
                         $('#ai_api_model').val(data.ext.ai_api_model || 'deepseek-r1');
                         $('#ai_api_key').val(data.ext.ai_api_key || '');
-                        $('#ai_api_temperature').val(data.ext.ai_api_temperature || '1.0');
-                        $('#ai_system_prompt').val(data.ext.ai_system_prompt || '你是一个专业的期权交易助手，可以帮助用户分析期权交易策略和市场行情。');
+                        $('#ai_api_temperature').val(data.ext.ai_api_temperature || '0.3');
+                        $('#ai_system_prompt').val(data.ext.ai_system_prompt || '');
                         
                         // 设置分析配置
                         $('#kline_period').val(data.ext.kline_period || 'WEEK');

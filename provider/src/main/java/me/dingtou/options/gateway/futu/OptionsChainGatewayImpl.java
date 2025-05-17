@@ -34,11 +34,11 @@ public class OptionsChainGatewayImpl implements OptionsChainGateway {
     /**
      * 期权链的长度
      */
-    private static final int STRIKE_DATE_SIZE = 8;
+    private static final int STRIKE_DATE_SIZE = 10;
     /**
      * 期权链上下浮动的价格范围
      */
-    private static final BigDecimal PRICE_RANGE = BigDecimal.valueOf(0.20);
+    private static final BigDecimal PRICE_RANGE = BigDecimal.valueOf(0.25);
 
     @Override
     public List<OptionsStrikeDate> getOptionsExpDate(Security security) {
@@ -104,6 +104,10 @@ public class OptionsChainGatewayImpl implements OptionsChainGateway {
 
         List<OptionsRealtimeData> realtimeData = queryOptionsRealtimeData(new ArrayList<>(allSecurity));
         mergeRealtimeData(optionsChain, realtimeData, lastDone);
+
+        // 过滤交易量0的期权
+        optionsChain.getOptionsList().removeIf(options -> options.getRealtimeData().getVolume() == 0);
+
         return optionsChain;
     }
 

@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -16,7 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import me.dingtou.options.constant.AccountExt;
-import me.dingtou.options.constant.Market;
 import me.dingtou.options.constant.OrderExt;
 import me.dingtou.options.constant.OrderStatus;
 import me.dingtou.options.constant.TradeSide;
@@ -34,6 +32,7 @@ import me.dingtou.options.model.OwnerSummary;
 import me.dingtou.options.model.Security;
 import me.dingtou.options.model.SecurityQuote;
 import me.dingtou.options.model.StockIndicator;
+import me.dingtou.options.model.StrategyExt;
 import me.dingtou.options.model.StrategySummary;
 import me.dingtou.options.service.SummaryService;
 import me.dingtou.options.strategy.OrderTradeStrategy;
@@ -72,8 +71,10 @@ public class SummaryServiceImpl implements SummaryService {
         BigDecimal allOptionsIncome = BigDecimal.ZERO;
         BigDecimal totalFee = BigDecimal.ZERO;
         BigDecimal unrealizedOptionsIncome = BigDecimal.ZERO;
+        BigDecimal allHoldStockProfit = BigDecimal.ZERO;
+        BigDecimal allIncome = BigDecimal.ZERO;
 
-        List<OwnerStrategy> ownerStrategies = ownerManager.queryOwnerStrategyForSummary(owner);
+        List<OwnerStrategy> ownerStrategies = ownerManager.queryOwnerStrategy(owner);
         List<StrategySummary> strategySummaries = new CopyOnWriteArrayList<>();
         // 批量拉取策略数据
         ownerStrategies.parallelStream().forEach(ownerStrategy -> {
@@ -94,8 +95,17 @@ public class SummaryServiceImpl implements SummaryService {
 
             strategySummary.getStrategyOrders().stream()
                     .filter(OwnerOrder::isOpen)
+                    .filter(OwnerOrder::isTraded)
                     .filter(OwnerOrder::isOptionsOrder)
-                    .forEach(unrealizedOrders::add);
+                    .filter(order -> OrderStatus.of(order.getStatus()).isValid())
+                    .forEach(order -> {
+                        order.setExtValue(OrderExt.STRATEGY_ID, strategySummary.getStrategy().getStrategyId());
+                        order.setExtValue(OrderExt.STRATEGY_NAME, strategySummary.getStrategy().getStrategyName());
+                        unrealizedOrders.add(order);
+                    });
+
+            allHoldStockProfit = allHoldStockProfit.add(strategySummary.getHoldStockProfit());
+            allIncome = allIncome.add(strategySummary.getAllIncome());
         }
 
         ownerSummary.setAllOptionsIncome(allOptionsIncome);
@@ -103,6 +113,8 @@ public class SummaryServiceImpl implements SummaryService {
         ownerSummary.setUnrealizedOptionsIncome(unrealizedOptionsIncome);
         ownerSummary.setStrategySummaries(strategySummaries);
         ownerSummary.setUnrealizedOrders(unrealizedOrders);
+        ownerSummary.setAllHoldStockProfit(allHoldStockProfit);
+        ownerSummary.setAllIncome(allIncome);
 
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM");
         Map<String, List<OwnerOrder>> monthOrder = strategySummaries.stream()
@@ -137,18 +149,29 @@ public class SummaryServiceImpl implements SummaryService {
 
         // 获取账户信息
         OwnerAccount account = ownerManager.queryOwnerAccount(owner);
-        String accountSizeConf = account.getExtValue(AccountExt.ACCOUNT_SIZE);
-        String marginRatioConf = account.getExtValue(AccountExt.MARGIN_RATIO);
-        String positionRatioConf = account.getExtValue(AccountExt.POSITION_RATIO);
+        String accountSizeConf = account.getExtValue(AccountExt.ACCOUNT_SIZE, null);
+        String marginRatioConf = account.getExtValue(AccountExt.MARGIN_RATIO, null);
+        String positionRatioConf = account.getExtValue(AccountExt.POSITION_RATIO, "0.1");
 
         if (StringUtils.isNotBlank(accountSizeConf) && StringUtils.isNotBlank(marginRatioConf)) {
             BigDecimal accountSize = new BigDecimal(accountSizeConf);
             BigDecimal marginRatio = new BigDecimal(marginRatioConf);
-            BigDecimal positionRatio = StringUtils.isNotBlank(positionRatioConf) ? new BigDecimal(positionRatioConf)
-                    : new BigDecimal("0.1");
-            ownerSummary.setAccountSize(accountSize);
+            BigDecimal positionRatio = new BigDecimal(positionRatioConf);
+
             ownerSummary.setMarginRatio(marginRatio);
             ownerSummary.setPositionRatio(positionRatio);
+
+            // 根据初始股票数和平均股价计算accountSize
+            BigDecimal initStockAccountSize = BigDecimal.ZERO;
+            for (StrategySummary strategySummary : strategySummaries) {
+                OwnerStrategy strategy = strategySummary.getStrategy();
+                int initialStockNum = Integer.parseInt(strategy.getExtValue(StrategyExt.INITIAL_STOCK_NUM, "0"));
+                BigDecimal averageStockCost = strategySummary.getAverageStockCost();
+                BigDecimal totalStockCost = averageStockCost.multiply(new BigDecimal(initialStockNum));
+                initStockAccountSize = initStockAccountSize.add(totalStockCost);
+            }
+            accountSize = accountSize.add(initStockAccountSize);
+            ownerSummary.setAccountSize(accountSize);
 
             // 计算PUT订单保证金占用和持有股票总成本
             BigDecimal putMarginOccupied = BigDecimal.ZERO;
@@ -158,10 +181,14 @@ public class SummaryServiceImpl implements SummaryService {
                 totalStockCost = totalStockCost.add(strategySummary.getTotalStockCost());
             }
             ownerSummary.setPutMarginOccupied(putMarginOccupied);
-            ownerSummary.setTotalStockCost(totalStockCost);
+            // 计算持有股票总成本(初始股票扣除)
+            ownerSummary.setTotalStockCost(totalStockCost.add(initStockAccountSize));
 
             // 计算可用资金
-            ownerSummary.setAvailableFunds(accountSize.subtract(putMarginOccupied).subtract(totalStockCost));
+            BigDecimal availableFunds = accountSize.subtract(putMarginOccupied)
+                    .subtract(totalStockCost)
+                    .subtract(initStockAccountSize);
+            ownerSummary.setAvailableFunds(availableFunds);
             ownerSummary.setTotalInvestment(putMarginOccupied.add(totalStockCost));
 
             // 计算未平仓订单的头寸占比
@@ -270,7 +297,7 @@ public class SummaryServiceImpl implements SummaryService {
         summary.setCurrentStockPrice(lastDone);
 
         // 股票订单
-        int holdStockNum = 0;
+        int orderHoldStockNum = 0;
         BigDecimal totalStockCost = BigDecimal.ZERO;
         List<OwnerOrder> securityOrders = ownerOrders.stream()
                 .filter(OwnerOrder::isStockOrder)
@@ -281,12 +308,12 @@ public class SummaryServiceImpl implements SummaryService {
             switch (tradeSide) {
                 case BUY:
                 case BUY_BACK:
-                    holdStockNum += securityOrder.getQuantity();
+                    orderHoldStockNum += securityOrder.getQuantity();
                     totalStockCost = totalStockCost.add(totalPrice);
                     break;
                 case SELL:
                 case SELL_SHORT:
-                    holdStockNum -= securityOrder.getQuantity();
+                    orderHoldStockNum -= securityOrder.getQuantity();
                     totalStockCost = totalStockCost.subtract(totalPrice);
                     break;
                 default:
@@ -294,13 +321,38 @@ public class SummaryServiceImpl implements SummaryService {
             }
 
         }
-        // 股票持有数量
-        summary.setHoldStockNum(holdStockNum);
+
         // 股票成本
         summary.setTotalStockCost(totalStockCost);
-        BigDecimal averageStockCost = holdStockNum == 0 ? BigDecimal.ZERO
-                : totalStockCost.divide(new BigDecimal(holdStockNum), 4, RoundingMode.HALF_UP);
+        BigDecimal averageStockCost = orderHoldStockNum == 0
+                ? BigDecimal.ZERO
+                : totalStockCost.divide(new BigDecimal(orderHoldStockNum), 4, RoundingMode.HALF_UP);
         summary.setAverageStockCost(averageStockCost);
+
+        // 初始股票数&成本
+        int initialStockNum = Integer.parseInt(ownerStrategy.getExtValue(StrategyExt.INITIAL_STOCK_NUM, "0"));
+        BigDecimal initialStockCost = new BigDecimal(ownerStrategy.getExtValue(StrategyExt.INITIAL_STOCK_COST, "0"));
+
+        // 总股票持有数量
+        int holdStockNum = initialStockNum + orderHoldStockNum;
+        summary.setHoldStockNum(holdStockNum);
+
+        int holdStockNumForProfit = holdStockNum - initialStockNum;
+        // 当初始股票被卖后 holdStockNum 会小于 initialStockNum
+        // 当holdStockNumForProfit小于0时，不计算持股收益
+        if (holdStockNumForProfit < 0) {
+            holdStockNumForProfit = 0;
+        }
+
+        // 未设置股票成本总盈亏 = （现价-平均成本） * 持股数量
+        // 股票现价小于股票成本时总盈亏 = （股票成本-平均成本） * 持股数量
+        BigDecimal holdStockPrice = lastDone;
+        if (initialStockCost.compareTo(lastDone) > 0) {
+            holdStockPrice = initialStockCost;
+        }
+        BigDecimal holdStockProfit = holdStockPrice.subtract(averageStockCost)
+                .multiply(new BigDecimal(holdStockNumForProfit));
+        summary.setHoldStockProfit(holdStockProfit);
 
         // 期权总金额
         List<OwnerOrder> allOptionsOrders = ownerOrders.stream()
@@ -313,19 +365,80 @@ public class SummaryServiceImpl implements SummaryService {
         BigDecimal allOptionsIncome = allOptionsOrders.stream()
                 .map(OwnerOrder::income)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        allOptionsIncome = allOptionsIncome.subtract(totalFee);
         // 期权利润
-        summary.setAllOptionsIncome(allOptionsIncome.subtract(totalFee));
+        summary.setAllOptionsIncome(allOptionsIncome);
 
-        // 所有未平仓的期权利润
-        BigDecimal unrealizedOptionsIncome = allOptionsOrders.stream()
+        // 总收入
+        summary.setAllIncome(allOptionsIncome.add(holdStockProfit));
+
+        // 所有未平仓的期权
+        List<OwnerOrder> allOpenOptionsOrder = allOptionsOrders.stream()
                 .filter(OwnerOrder::isOpen)
+                .filter(OwnerOrder::isTraded)
+                .filter(OwnerOrder::isOptionsOrder)
+                .filter(order -> OrderStatus.of(order.getStatus()).isValid())
+                .toList();
+
+        // 未平仓的期权利润
+        BigDecimal unrealizedOptionsIncome = allOpenOptionsOrder.stream()
                 .map(OwnerOrder::income)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         // 期权利润
         summary.setUnrealizedOptionsIncome(unrealizedOptionsIncome);
 
+        // 获取期权Delta
+        List<Security> allOpenOptionsSecurity = allOpenOptionsOrder.stream()
+                .map(order -> Security.of(order.getCode(), order.getMarket()))
+                .toList();
+        List<OptionsRealtimeData> allOpenOptionsRealtimeData = optionsManager
+                .queryOptionsRealtimeData(allOpenOptionsSecurity);
+        // 计算Delta
+        Map<Security, OptionsRealtimeData> securityDeltaMap = new HashMap<>();
+        for (OptionsRealtimeData realtimeData : allOpenOptionsRealtimeData) {
+            securityDeltaMap.put(realtimeData.getSecurity(), realtimeData);
+        }
+        // 计算未平仓期权的Delta
+        BigDecimal optionsDelta = BigDecimal.ZERO;
+        BigDecimal optionsGamma = BigDecimal.ZERO;
+        BigDecimal optionsTheta = BigDecimal.ZERO;
+        for (OwnerOrder order : allOpenOptionsOrder) {
+            OptionsRealtimeData realtimeData = securityDeltaMap.get(Security.of(order.getCode(), order.getMarket()));
+            if (null == realtimeData) {
+                continue;
+            }
+            BigDecimal quantity = new BigDecimal(order.getQuantity());
+            // 卖出为负 买入为正
+            BigDecimal side = new BigDecimal(TradeSide.of(order.getSide()).getSign() * -1);
+            BigDecimal delta = realtimeData.getDelta().multiply(side).multiply(quantity);
+            BigDecimal gamma = realtimeData.getGamma().multiply(side).multiply(quantity);
+            BigDecimal theta = realtimeData.getTheta().multiply(side).multiply(quantity);
+
+            optionsDelta = optionsDelta.add(delta);
+            optionsGamma = optionsGamma.add(gamma);
+            optionsTheta = optionsTheta.add(theta);
+        }
+        // 股票Delta
+        BigDecimal stockDelta = BigDecimal.valueOf(holdStockNum).divide(lotSize, 4, RoundingMode.HALF_UP);
+
+        // 策略Delta
+        BigDecimal strategyDelta = stockDelta.add(optionsDelta);
+        summary.setStrategyDelta(strategyDelta);
+
+        // 多空方向：strategyDelta/(持股数量/lotSize)
+        BigDecimal holdNum = BigDecimal.valueOf(holdStockNum).divide(lotSize, 4, RoundingMode.HALF_UP);
+        BigDecimal strategyDirection = (holdStockNum == 0)
+                ? BigDecimal.ZERO
+                : strategyDelta.divide(holdNum, 4, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100));
+        summary.setStrategyDirection(strategyDirection);
+
+        // 策略Gamma(未平仓期权Gamma)
+        summary.setStrategyGamma(optionsGamma);
+        // 策略Theta(未平仓期权Theta)
+        summary.setStrategyTheta(optionsTheta);
+
         // 计算PUT订单保证金占用
-        String marginRatioConfig = account.getExtValue(AccountExt.MARGIN_RATIO);
+        String marginRatioConfig = account.getExtValue(AccountExt.MARGIN_RATIO, null);
 
         if (null != marginRatioConfig) {
             BigDecimal marginRatio = new BigDecimal(marginRatioConfig);
@@ -347,14 +460,9 @@ public class SummaryServiceImpl implements SummaryService {
             summary.setPutMarginOccupied(putMarginOccupied);
         }
 
-        // 计算未平仓订单的AI提示
-        List<OwnerOrder> openOrders = ownerOrders.stream()
-                .filter(OwnerOrder::isOpen)
-                .filter(OwnerOrder::isOptionsOrder)
-                .toList();
         // 未平仓订单处理策略
         OrderTradeStrategy defaultOrderTradeStrategy = new DefaultOrderTradeStrategy();
-        for (OwnerOrder order : openOrders) {
+        for (OwnerOrder order : allOpenOptionsOrder) {
 
             // 查询未平仓订单可以Roll的期权实时数据 [当前行权价格, 当前行权价格-5]
             // 查询股票期权到期日

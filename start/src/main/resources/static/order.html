@@ -14,26 +14,16 @@
     <div class="layui-header">
         <div class="layui-logo layui-hide-xs layui-bg-black">Options</div>
         <!-- 头部区域（可配合layui 已有的水平导航） -->
+        <ul class="layui-nav layui-layout-left">
+            <li class="layui-nav-item"><a href="index.html">标的分析</a></li>
+            <li class="layui-nav-item layui-this"><a href="order.html">策略订单</a></li>
+            <li class="layui-nav-item"><a href="income.html">账户收益</a></li>
+            <li class="layui-nav-item"><a href="assistant.html">AI 助手</a></li>
+            <li class="layui-nav-item"><a href="sync.html">同步订单</a></li>
+            <li class="layui-nav-item"><a href="admin.html">后台管理</a></li>
+        </ul>
     </div>
-    <div class="layui-side layui-bg-black">
-        <div class="layui-side-scroll">
-            <!-- 左侧导航区域（可配合layui已有的垂直导航） -->
-            <ul class="layui-nav layui-nav-tree">
-                <li class="layui-nav-item"><a href="index.html">标的分析</a></li>
-                <li class="layui-nav-item layui-nav-itemed layui-this">
-                    <a href="javascript:;">策略订单</a>
-                    <dl class="layui-nav-child" id="security" lay-filter="security">
-                        <dd><a href="javascript:;">loading...</a></dd>
-                    </dl>
-                </li>
-                <li class="layui-nav-item"><a href="income.html">账户收益</a></li>
-                <li class="layui-nav-item"><a href="assistant.html">AI 助手</a></li>
-                <li class="layui-nav-item"><a href="sync.html">同步订单</a></li>
-                <li class="layui-nav-item"><a href="admin.html">后台管理</a></li>
-            </ul>
-        </div>
-    </div>
-    <div class="layui-body">
+    <div class="layui-body" style="left: 0;">
         <!-- 内容主体区域 -->
         <div style="padding: 15px;">
             <input type="hidden" id="owner"/>
@@ -45,11 +35,22 @@
                 <div class="layui-form-mid layui-word-aux">OTP验证码</div>
                 <button type="button" class="layui-btn layui-bg-blue" onClick="sync()">同步订单</button>
             </div>
-            <blockquote class="layui-elem-quote layui-text" id="title" lay-filter="title">
-                点击股票查询详情
-            </blockquote>
-            <div class="layui-card layui-panel">
-                <div class="layui-card-body" id="result" lay-filter="result">
+            
+            <!-- 策略Tab -->
+            <div class="layui-tab" lay-filter="strategyTab">
+                <ul class="layui-tab-title" id="strategyTabTitle">
+                    <li class="layui-this">加载中...</li>
+                </ul>
+                <div class="layui-tab-content">
+                    <div class="layui-tab-item layui-show">
+                        <blockquote class="layui-elem-quote layui-text" id="title" lay-filter="title">
+                            加载中...
+                        </blockquote>
+                        <div class="layui-card layui-panel">
+                            <div class="layui-card-body" id="result" lay-filter="result">
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -57,13 +58,34 @@
 
 </div>
 <script id="summary" type="text/html">
-    <h4 class="layui-bg-gray">{{ d.strategy.strategyName }} - ${{ d.allOptionsIncome }}（当前策略:{{ d.strategy.strategyCode }})</h4>
+    <h4 class="layui-bg-gray">
+        {{ d.strategy.strategyName }} | <b>${{ d.allOptionsIncome }}</b> 
+        <b style="color: red;"> (Delta:{{ d.strategyDelta }}｜Gamma:{{ d.strategyGamma }}｜Theta:{{ d.strategyTheta }}) </b>
+        <span class="layui-badge layui-font-16">持股多空:{{ d.strategyDirection }}%</span>
+    </h4>
     <ul class="layui-font-12">
-        <li><span class="layui-badge layui-bg-blue">策略ID:{{ d.strategy.strategyId }}</span></li>
-        <li><span class="layui-badge layui-bg-blue">期权已到账收入:${{ d.allOptionsIncome }} (已扣除手续费${{ d.totalFee }})</span></li>
-        <li><span class="layui-badge layui-bg-blue">期权未到期收入:${{ d.unrealizedOptionsIncome }}</span></li>
-        <li><span class="layui-badge layui-bg-blue">策略持有股票:{{ d.holdStockNum }}（当前股价:${{ d.currentStockPrice }}）</span></li>
-        <li><span class="layui-badge layui-bg-blue">策略股票花费:${{ d.totalStockCost }}（平均成本:${{ d.averageStockCost }}）</span></li>
+        <li>
+            <span class="layui-badge layui-bg-blue">
+                策略ID:<b>{{ d.strategy.strategyId }}</b> 
+                | 策略代码:<b>{{ d.strategy.strategyCode }}</b> 
+                | 保证金占用:<b>${{ d.putMarginOccupied }}</b>
+            </span>
+        </li>
+        <li>
+            <span class="layui-badge layui-bg-blue">
+                期权已到账收入:<b>${{ d.allOptionsIncome }}</b>(已扣除手续费<b>${{ d.totalFee }}</b>) 
+                | 未到期收入:<b>${{ d.unrealizedOptionsIncome }}</b>
+            </span>
+        </li>
+        <li>
+            <span class="layui-badge layui-bg-blue">
+                策略持有股票:<b>{{ d.holdStockNum }}</b> 
+                | 平均成本:<b>${{ d.averageStockCost }}</b> 
+                | 当前股价:<b>${{ d.currentStockPrice }}</b> 
+                | 股票花费:<b>${{ d.totalStockCost }}</b> 
+                | 股票盈亏:<b>${{ d.holdStockProfit }}</b>
+            </span>
+        </li>
     </ul>
 </script>
 <script id="TPL-orderOp" type="text/html">
@@ -82,6 +104,8 @@
         {{# if([15].includes(d.status) ){ }}
             <a class="layui-btn layui-btn-primary layui-btn-xs" lay-event="delete">删除</a>
         {{#  } }}
+        <a class="layui-btn layui-btn-primary layui-btn-xs" lay-event="updateStatus">状态</a>
+        <a class="layui-btn layui-btn-primary layui-btn-xs" lay-event="updateStrategy">策略</a>
     </div>
 </script>
 <script type="text/html" id="TPL-colorStatus">

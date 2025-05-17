@@ -1,6 +1,5 @@
 package me.dingtou.options.manager;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import me.dingtou.options.constant.OrderExt;
 import me.dingtou.options.constant.OrderStatus;
 import me.dingtou.options.constant.TradeFrom;
@@ -192,7 +191,10 @@ public class TradeManager {
             OwnerOrder platformOrder = plateformOrderMap.get(platformOrderId);
             if (null != platformOrder) {
                 dbOrder.setQuantity(platformOrder.getQuantity());
-                dbOrder.setStatus(platformOrder.getStatus());
+                // 提前指派后不再更新订单状态
+                if (!OrderStatus.EARLY_ASSIGNED.equals(OrderStatus.of(platformOrder.getStatus()))) {
+                    dbOrder.setStatus(platformOrder.getStatus());
+                }
                 dbOrder.setTradeTime(platformOrder.getTradeTime());
                 dbOrder.setStrikeTime(platformOrder.getStrikeTime());
                 dbOrder.setPlatformOrderIdEx(platformOrder.getPlatformOrderIdEx());
@@ -307,14 +309,7 @@ public class TradeManager {
     }
 
     public OwnerStrategy queryStrategy(String ownerStrategyId) {
-        QueryWrapper<OwnerStrategy> querySecurity = new QueryWrapper<>();
-        querySecurity.eq("strategy_id", ownerStrategyId);
-        List<OwnerStrategy> ownerStrategyList = ownerStrategyDAO.selectList(querySecurity);
-        if (null == ownerStrategyList || ownerStrategyList.size() != 1) {
-            return null;
-        }
-        return ownerStrategyList.get(0);
-
+        return ownerStrategyDAO.queryStrategyByStrategyId(ownerStrategyId);
     }
 
     public BigDecimal queryTotalOrderFee(OwnerAccount account, List<OwnerOrder> ownerOrders) {
@@ -356,5 +351,24 @@ public class TradeManager {
             num += ownerOrderDAO.updateById(dbOrder);
         }
         return num;
+    }
+
+    /**
+     * 修改订单状态
+     *
+     * @param account 账户
+     * @param orderId 订单ID
+     * @param status  新状态
+     * @return 是否成功
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public boolean updateOrderStatus(OwnerAccount account, Long orderId, OrderStatus status) {
+        OwnerOrder dbOrder = ownerOrderDAO.queryOwnerOrderById(account.getOwner(), orderId);
+        if (null == dbOrder || !account.getOwner().equals(dbOrder.getOwner())) {
+            return false;
+        }
+        dbOrder.setStatus(status.getCode());
+        dbOrder.setUpdateTime(new Date());
+        return ownerOrderDAO.updateById(dbOrder) > 0;
     }
 }

@@ -19,14 +19,39 @@ public class StrategySummary {
     private OwnerStrategy strategy;
 
     /**
+     * 策略总体Delta
+     */
+    private BigDecimal strategyDelta;
+
+    /**
+     * 策略总体Gamma
+     */
+    private BigDecimal strategyGamma;
+
+    /**
+     * 策略总体Theta
+     */
+    private BigDecimal strategyTheta;
+
+    /**
+     * 策略方向(-100->0->100) 100=100%看多，-100=100%看空
+     */
+    private BigDecimal strategyDirection;
+
+    /**
      * 总手续费
      */
     private BigDecimal totalFee;
 
     /**
-     * 期权总收益
+     * 期权总收益(已经扣除手续费)
      */
     private BigDecimal allOptionsIncome;
+
+    /**
+     * 总收入（期权总收益+股票盈亏）
+     */
+    private BigDecimal allIncome;
 
     /**
      * 未实现期权收益
@@ -37,6 +62,16 @@ public class StrategySummary {
      * 持有股票数
      */
     private Integer holdStockNum;
+
+    /**
+     * 持有股票成本价
+     */
+    private BigDecimal holdStockCost;
+
+    /**
+     * 持股盈亏
+     */
+    private BigDecimal holdStockProfit;
 
     /**
      * 股票总成本

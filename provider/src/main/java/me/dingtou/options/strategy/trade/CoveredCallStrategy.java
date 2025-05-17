@@ -11,7 +11,7 @@ import java.util.Date;
 import java.util.List;
 
 @Component
-public class SellStrategy extends BaseTradeStrategy {
+public class CoveredCallStrategy extends BaseTradeStrategy {
 
     @Override
     void process(OwnerAccount account,
@@ -47,19 +47,14 @@ public class SellStrategy extends BaseTradeStrategy {
 
         BigDecimal securityPrice = securityQuote.getLastDone();
         StringBuilder prompt = new StringBuilder();
-        prompt.append("我准备卖出").append(securityQuote.getSecurity().toString())
-                .append("距离到期日").append(optionsChain.dte()).append("天的期权");
+        prompt.append("我打算长期持有").append(securityQuote.getSecurity().toString())
+                .append("，同时准备通过做CoveredCall对冲组合风险，如果可以顺便赚取部分权利金，组合目标Delta0.25到0.75之间，备选的期权距离到期日")
+                .append(optionsChain.dte()).append("天");
         if (null != summary) {
             prompt.append("，策略ID:").append(summary.getStrategy().getStrategyId());
-            if (null != summary.getHoldStockNum()) {
-                prompt.append("，当前持有股票数量：").append(summary.getHoldStockNum());
-                // 展示持有股票成本价
-                if (summary.getHoldStockCost() != null && summary.getHoldStockCost().compareTo(BigDecimal.ZERO) > 0) {
-                    prompt.append("，持有股票成本价：").append(summary.getHoldStockCost());
-                }
-            }
+            prompt.append("，当前持有股数:").append(summary.getHoldStockNum());
         }
-        prompt.append("当前股票价格是").append(securityPrice)
+        prompt.append("，当前股票价格是").append(securityPrice)
                 .append(null != vixIndicator && null != vixIndicator.getCurrentVix()
                         ? "，当前VIX指数是" + vixIndicator.getCurrentVix().getValue()
                         : "")
@@ -103,10 +98,10 @@ public class SellStrategy extends BaseTradeStrategy {
         prompt.append("## 交易标的\n");
         prompt.append("| 代码 ").append("| 期权类型 ").append("| 行权价 ").append("| 当前价格 ").append("| 隐含波动率 ")
                 .append("| Delta ").append("| Theta ").append("| Gamma ").append("| 未平仓合约数 ").append("| 当天交易量 ")
-                .append("| 预估年化收益率 ").append("| 距离行权价涨跌幅 ").append("| 购买倾向 ").append("|\n");
+                .append("| 预估年化收益率 ").append("| 距离行权价涨跌幅 ").append("|\n");
         prompt.append("| --- ").append("| --- ").append("| --- ").append("| --- ").append("| --- ").append("| --- ")
                 .append("| --- ").append("| --- ").append("| --- ").append("| --- ").append("| --- ").append("| --- ")
-                .append("| --- ").append("|\n");
+                .append("|\n");
         optionsChain.getOptionsList().forEach(options -> {
             buildOptionsPrompt(prompt, options);
         });
@@ -130,12 +125,11 @@ public class SellStrategy extends BaseTradeStrategy {
                 .append(" | ").append(options.getRealtimeData().getVolume())
                 .append(" | ").append(options.getStrategyData().getSellAnnualYield()).append("%")
                 .append(" | ").append(options.getStrategyData().getRange()).append("%")
-                .append(" | ").append(options.getStrategyData().getRecommendLevel() <= 1 ? "一般" : "倾向")
                 .append(" |\n");
     }
 
     @Override
     public boolean isSupport(OwnerStrategy strategy) {
-        return null == strategy || "default".equalsIgnoreCase(strategy.getStrategyCode());
+        return null == strategy || "cc_strategy".equalsIgnoreCase(strategy.getStrategyCode());
     }
 }

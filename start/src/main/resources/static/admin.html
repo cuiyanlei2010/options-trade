@@ -29,91 +29,87 @@
 <body>
     <div class="layui-layout layui-layout-admin">
         <div class="layui-header">
-            <div class="layui-logo layui-hide-xs">Options Trade Tools</div>
+            <div class="layui-logo layui-hide-xs layui-bg-black">Options</div>
+            <ul class="layui-nav layui-layout-left">
+                <li class="layui-nav-item"><a href="index.html">标的分析</a></li>
+                <li class="layui-nav-item"><a href="order.html">策略订单</a></li>
+                <li class="layui-nav-item"><a href="income.html">账户收益</a></li>
+                <li class="layui-nav-item"><a href="assistant.html">AI 助手</a></li>
+                <li class="layui-nav-item"><a href="sync.html">同步订单</a></li>
+                <li class="layui-nav-item layui-this"><a href="admin.html">后台管理</a></li>
+            </ul>
         </div>
 
-        <div class="layui-side layui-bg-black">
-            <div class="layui-side-scroll">
-                <!-- 左侧导航区域（可配合layui已有的垂直导航） -->
-                <ul class="layui-nav layui-nav-tree">
-                    <li class="layui-nav-item"><a href="index.html">标的分析</a></li>
-                    <li class="layui-nav-item"><a href="order.html">策略订单</a></li>
-                    <li class="layui-nav-item"><a href="income.html">账户收益</a></li>
-                    <li class="layui-nav-item"><a href="assistant.html">AI 助手</a></li>
-                    <li class="layui-nav-item"><a href="sync.html">同步订单</a></li>
-                    <li class="layui-nav-item layui-nav-itemed layui-this"><a href="admin.html">后台管理</a></li>
-                </ul>
-            </div>
-        </div>
-
-        <div class="layui-body" style="padding: 15px;">
-            <!-- Tab选项卡 -->
-            <div class="layui-tab layui-tab-brief" lay-filter="adminTab">
-                <ul class="layui-tab-title">
-                    <li class="layui-this">期权标的管理</li>
-                    <li>期权策略管理</li>
-                    <li>账户管理</li>
-                </ul>
-                <div class="layui-tab-content">
-                    <!-- 期权标的管理 -->
-                    <div class="layui-tab-item layui-show">
-                        <div class="layui-card">
-                            <div class="layui-card-header">期权标的管理</div>
-                            <div class="layui-card-body">
-                                <div class="layui-btn-group">
-                                    <button type="button" class="layui-btn layui-btn-sm" id="addSecurityBtn">
-                                        <i class="layui-icon">&#xe654;</i> 添加标的
-                                    </button>
-                                    <button type="button" class="layui-btn layui-btn-sm layui-btn-danger" id="deleteSecurityBtn">
-                                        <i class="layui-icon">&#xe640;</i> 删除
-                                    </button>
-                                    <button type="button" class="layui-btn layui-btn-sm layui-btn-normal" id="refreshSecurityBtn">
-                                        <i class="layui-icon">&#xe669;</i> 刷新
-                                    </button>
+        <div class="layui-body" style="left: 0;">
+            <div style="padding: 15px;">
+                <!-- Tab选项卡 -->
+                <div class="layui-tab layui-tab-brief" lay-filter="adminTab">
+                    <ul class="layui-tab-title">
+                        <li class="layui-this">期权标的管理</li>
+                        <li>期权策略管理</li>
+                        <li>账户管理</li>
+                    </ul>
+                    <div class="layui-tab-content">
+                        <!-- 期权标的管理 -->
+                        <div class="layui-tab-item layui-show">
+                            <div class="layui-card">
+                                <div class="layui-card-header">期权标的管理</div>
+                                <div class="layui-card-body">
+                                    <div class="layui-btn-group">
+                                        <button type="button" class="layui-btn layui-btn-sm" id="addSecurityBtn">
+                                            <i class="layui-icon">&#xe654;</i> 添加标的
+                                        </button>
+                                        <button type="button" class="layui-btn layui-btn-sm layui-btn-danger" id="deleteSecurityBtn">
+                                            <i class="layui-icon">&#xe640;</i> 删除
+                                        </button>
+                                        <button type="button" class="layui-btn layui-btn-sm layui-btn-normal" id="refreshSecurityBtn">
+                                            <i class="layui-icon">&#xe669;</i> 刷新
+                                        </button>
+                                    </div>
+                                    <table id="securityTable" lay-filter="securityTable"></table>
                                 </div>
-                                <table id="securityTable" lay-filter="securityTable"></table>
                             </div>
                         </div>
-                    </div>
-                    
-                    <!-- 期权策略管理 -->
-                    <div class="layui-tab-item">
-                        <div class="layui-card">
-                            <div class="layui-card-header">期权策略管理</div>
-                            <div class="layui-card-body">
-                                <div class="layui-btn-group">
-                                    <button type="button" class="layui-btn layui-btn-sm" id="addStrategyBtn">
-                                        <i class="layui-icon">&#xe654;</i> 添加策略
-                                    </button>
-                                    <button type="button" class="layui-btn layui-btn-sm layui-btn-danger" id="deleteStrategyBtn">
-                                        <i class="layui-icon">&#xe640;</i> 删除
-                                    </button>
-                                    <button type="button" class="layui-btn layui-btn-sm layui-btn-normal" id="refreshStrategyBtn">
-                                        <i class="layui-icon">&#xe669;</i> 刷新
-                                    </button>
+                        
+                        <!-- 期权策略管理 -->
+                        <div class="layui-tab-item">
+                            <div class="layui-card">
+                                <div class="layui-card-header">期权策略管理</div>
+                                <div class="layui-card-body">
+                                    <div class="layui-btn-group">
+                                        <button type="button" class="layui-btn layui-btn-sm" id="addStrategyBtn">
+                                            <i class="layui-icon">&#xe654;</i> 添加策略
+                                        </button>
+                                        <button type="button" class="layui-btn layui-btn-sm layui-btn-danger" id="deleteStrategyBtn">
+                                            <i class="layui-icon">&#xe640;</i> 删除
+                                        </button>
+                                        <button type="button" class="layui-btn layui-btn-sm layui-btn-normal" id="refreshStrategyBtn">
+                                            <i class="layui-icon">&#xe669;</i> 刷新
+                                        </button>
+                                    </div>
+                                    <table id="strategyTable" lay-filter="strategyTable"></table>
                                 </div>
-                                <table id="strategyTable" lay-filter="strategyTable"></table>
                             </div>
                         </div>
-                    </div>
-                    
-                    <!-- 账户管理 -->
-                    <div class="layui-tab-item">
-                        <div class="layui-card">
-                            <div class="layui-card-header">账户管理</div>
-                            <div class="layui-card-body">
-                                <div class="layui-btn-group">
-                                    <button type="button" class="layui-btn layui-btn-sm" id="addAccountBtn">
-                                        <i class="layui-icon">&#xe654;</i> 添加账户
-                                    </button>
-                                    <button type="button" class="layui-btn layui-btn-sm layui-btn-danger" id="deleteAccountBtn">
-                                        <i class="layui-icon">&#xe640;</i> 删除
-                                    </button>
-                                    <button type="button" class="layui-btn layui-btn-sm layui-btn-normal" id="refreshAccountBtn">
-                                        <i class="layui-icon">&#xe669;</i> 刷新
-                                    </button>
+                        
+                        <!-- 账户管理 -->
+                        <div class="layui-tab-item">
+                            <div class="layui-card">
+                                <div class="layui-card-header">账户管理</div>
+                                <div class="layui-card-body">
+                                    <div class="layui-btn-group">
+                                        <button type="button" class="layui-btn layui-btn-sm" id="addAccountBtn">
+                                            <i class="layui-icon">&#xe654;</i> 添加账户
+                                        </button>
+                                        <button type="button" class="layui-btn layui-btn-sm layui-btn-danger" id="deleteAccountBtn">
+                                            <i class="layui-icon">&#xe640;</i> 删除
+                                        </button>
+                                        <button type="button" class="layui-btn layui-btn-sm layui-btn-normal" id="refreshAccountBtn">
+                                            <i class="layui-icon">&#xe669;</i> 刷新
+                                        </button>
+                                    </div>
+                                    <table id="accountTable" lay-filter="accountTable"></table>
                                 </div>
-                                <table id="accountTable" lay-filter="accountTable"></table>
                             </div>
                         </div>
                     </div>
@@ -204,6 +200,7 @@
                         <option value="">请选择策略代码</option>
                         <option value="default">默认策略</option>
                         <option value="wheel_strategy">车轮策略</option>
+                        <option value="cc_strategy">CC策略</option>
                     </select>
                 </div>
             </div>
@@ -229,6 +226,20 @@
                 <label class="layui-form-label">合约股数</label>
                 <div class="layui-input-block">
                     <input type="number" name="lotSize" required lay-verify="required" placeholder="请输入每份合约股票数" autocomplete="off" class="layui-input" value="100">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">初始股票数</label>
+                <div class="layui-input-block">
+                    <input type="number" name="initialStockNum" placeholder="请输入策略初始股票数量" autocomplete="off" class="layui-input" value="0">
+                    <div class="layui-form-mid layui-word-aux">如果已持有股票，请输入持有数量，默认为0</div>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">初始成本价</label>
+                <div class="layui-input-block">
+                    <input type="number" name="initialStockCost" placeholder="请输入初始股票成本价" autocomplete="off" class="layui-input" value="0">
+                    <div class="layui-form-mid layui-word-aux">已持有股票的平均成本价，用于计算盈亏</div>
                 </div>
             </div>
             <div class="layui-form-item" id="wheelStrategyConfig" style="display: none;">
@@ -379,7 +390,7 @@
             <div class="layui-form-item">
                 <label class="layui-form-label">系统提示词</label>
                 <div class="layui-input-block">
-                    <textarea id="ai_system_prompt" placeholder="请输入系统提示词" class="layui-textarea" rows="4">你是一个专业的期权交易助手，可以帮助用户分析期权交易策略和市场行情。</textarea>
+                    <textarea id="ai_system_prompt" placeholder="请输入系统提示词" class="layui-textarea" rows="4"></textarea>
                     <div class="layui-form-mid layui-word-aux">系统提示词用于指导AI助手的行为和回答方式</div>
                 </div>
             </div>

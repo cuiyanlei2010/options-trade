@@ -2,6 +2,23 @@
 // 实时更新当前股票价格
 var currentPrice = {};
 var assistantWindow;
+// 添加筛选状态变量
+var filterState = {
+    putOnly: false,
+    callOnly: false
+};
+var originalOrderData = [];
+
+/**
+ * 跳转到策略订单页面
+ * @param {string} strategyId 策略ID
+ */
+function goToStrategyOrders(strategyId) {
+    if (!strategyId) return;
+    
+    // 跳转到order.html页面并传递策略ID参数
+    window.location.href = 'order.html?strategyId=' + encodeURIComponent(strategyId);
+}
 
 function assistant(prompt, title) {
     localStorage.setItem("title", title || "期权订单分析");
@@ -18,6 +35,9 @@ function renderOrderTable(orderList){
         return;
     }
 
+    // 保存原始数据
+    originalOrderData = orderList;
+    
     var convertedData = orderList.map(item => {
         // 计算盈亏比例的颜色
         let profitRatioClass = '';
@@ -64,9 +84,43 @@ function renderOrderTable(orderList){
             "prompt": item.ext ? item.ext.prompt : null
         };
     });
+    
+    // 应用筛选
+    var filteredData = applyFilter(convertedData);
 
-    layui.use('table', function(){
+    layui.use(['table', 'form'], function(){
       var table = layui.table;
+      var form = layui.form;
+      
+      // 在表格上方添加筛选按钮
+      var filterHtml = `
+        <div class="layui-btn-group option-filter" style="margin-bottom: 10px;">
+          <button class="layui-btn layui-btn-sm ${filterState.putOnly ? 'layui-btn-normal' : 'layui-btn-primary'}" id="putFilterBtn">
+            仅显示PUT <span class="layui-badge layui-bg-orange">${countOptionTypes(convertedData).put}</span>
+          </button>
+          <button class="layui-btn layui-btn-sm ${filterState.callOnly ? 'layui-btn-normal' : 'layui-btn-primary'}" id="callFilterBtn">
+            仅显示CALL <span class="layui-badge layui-bg-orange">${countOptionTypes(convertedData).call}</span>
+          </button>
+          <button class="layui-btn layui-btn-sm layui-btn-primary" id="resetFilterBtn">
+            重置筛选 <span class="layui-badge layui-bg-blue">${convertedData.length}</span>
+          </button>
+        </div>
+      `;
+      
+      // 添加筛选按钮到表格区域
+      var tableContainer = document.querySelector('#orderTable');
+      var filterContainer = document.createElement('div');
+      filterContainer.id = 'option-filter-container';
+      filterContainer.innerHTML = filterHtml;
+      
+      // 检查是否已经存在筛选按钮
+      var existingFilterContainer = document.getElementById('option-filter-container');
+      if(existingFilterContainer) {
+        existingFilterContainer.innerHTML = filterHtml;
+      } else {
+        tableContainer.parentNode.insertBefore(filterContainer, tableContainer);
+      }
+      
       var inst = table.render({
         elem: '#orderTable',
         cols: [[
@@ -76,6 +130,12 @@ function renderOrderTable(orderList){
               }
               return '';
           }},
+          {field: 'strategyName', title: '策略名称', width: 150, templet: function(d){
+              if (d.ext && d.ext.strategyName && d.ext.strategyId) {
+                  return '<a href="javascript:void(0);" class="strategy-link" data-strategy-id="' + d.ext.strategyId + '">' + d.ext.strategyName + '</a>';
+              }
+              return d.ext && d.ext.strategyName ? d.ext.strategyName : '-';
+          }},
           {field: 'tradeTime', title: '交易时间', width: 165},
           {field: 'strikeTime', title: '行权时间', width: 120},
           {field: 'code', title: '期权代码', width: 180},
@@ -84,9 +144,9 @@ function renderOrderTable(orderList){
             }
           },
           {field: 'strikePrice', title: '行权价', width: 80},
-          {field: 'curDTE', title: '到期天数', width: 100},
+          {field: 'curDTE', title: '剩余/天', width: 100, sort: true},
           {field: 'side', title: '类型', width: 80},
-          {field: 'quantity', title: '数量', width: 80},
+          {field: 'quantity', title: '合约数', width: 80},
           {field: 'statusStr', title: '状态', width: 100},
           {field: 'price', title: '价格', width: 80},
           {field: 'totalIncome', title: '收入', width: 80},
@@ -104,7 +164,7 @@ function renderOrderTable(orderList){
           }}
           
         ]],
-        data: convertedData,
+        data: filteredData,
         toolbar: true,
         lineStyle: 'height: 100%;',
         defaultToolbar: [
@@ -116,6 +176,7 @@ function renderOrderTable(orderList){
           field: 'tradeTime',
           type: 'asc'
         },
+        sort: true,
         page: false,
         limits: [100, 200, 500],
         limit: 100,
@@ -127,6 +188,17 @@ function renderOrderTable(orderList){
                 if(item.rowClass === 'strike-alert'){
                     const tr = table.find('.layui-table-box tbody tr[data-index="'+ index +'"]');
                     tr.addClass('strike-alert');
+                }
+            });
+            
+            // 绑定筛选按钮事件
+            bindFilterEvents();
+            
+            // 绑定策略名称点击事件
+            table.find('.strategy-link').on('click', function() {
+                var strategyId = this.getAttribute('data-strategy-id');
+                if (strategyId) {
+                    goToStrategyOrders(strategyId);
                 }
             });
         }
@@ -146,6 +218,108 @@ function renderOrderTable(orderList){
     });
 
     render();
+}
+
+// 添加筛选按钮事件绑定函数
+function bindFilterEvents() {
+    document.getElementById('putFilterBtn').onclick = function() {
+        filterState.putOnly = !filterState.putOnly;
+        filterState.callOnly = false; // 确保同时只有一种筛选激活
+        refreshOrderTable();
+    };
+    
+    document.getElementById('callFilterBtn').onclick = function() {
+        filterState.callOnly = !filterState.callOnly;
+        filterState.putOnly = false; // 确保同时只有一种筛选激活
+        refreshOrderTable();
+    };
+    
+    document.getElementById('resetFilterBtn').onclick = function() {
+        filterState.putOnly = false;
+        filterState.callOnly = false;
+        refreshOrderTable();
+    };
+}
+
+// 添加计算不同类型期权数量的函数
+function countOptionTypes(data) {
+    let putCount = 0;
+    let callCount = 0;
+    
+    data.forEach(item => {
+        if (item.isPut) putCount++;
+        if (item.isCall) callCount++;
+    });
+    
+    return {
+        put: putCount,
+        call: callCount
+    };
+}
+
+// 应用筛选函数
+function applyFilter(data) {
+    if (!filterState.putOnly && !filterState.callOnly) {
+        return data; // 没有筛选条件，返回全部数据
+    }
+    
+    return data.filter(item => {
+        if (filterState.putOnly && item.isPut) return true;
+        if (filterState.callOnly && item.isCall) return true;
+        return false;
+    });
+}
+
+// 刷新表格数据
+function refreshOrderTable() {
+    if (!originalOrderData || originalOrderData.length === 0) return;
+    
+    // 获取表格数据的转换副本
+    var convertedData = originalOrderData.map(item => {
+        // 此处可以只返回isPut和isCall属性，因为这是筛选所需的
+        return {
+            "isPut": item.ext ? item.ext.isPut : false,
+            "isCall": item.ext ? item.ext.isCall : false
+        };
+    });
+    
+    // 更新筛选按钮上的数量显示
+    updateFilterCounts(convertedData);
+    
+    // 重新渲染表格
+    renderOrderTable(originalOrderData);
+}
+
+// 更新筛选按钮上显示的数量
+function updateFilterCounts(data) {
+    const counts = countOptionTypes(data);
+    const totalCount = data.length;
+    
+    const putBtn = document.getElementById('putFilterBtn');
+    const callBtn = document.getElementById('callFilterBtn');
+    const resetBtn = document.getElementById('resetFilterBtn');
+    
+    if (putBtn) {
+        // 如果启用了PUT筛选，显示筛选后的数量和总数
+        if (filterState.putOnly) {
+            putBtn.innerHTML = `仅显示PUT <span class="layui-badge layui-bg-orange">${counts.put}/${counts.put}</span>`;
+        } else {
+            putBtn.innerHTML = `仅显示PUT <span class="layui-badge layui-bg-orange">${counts.put}</span>`;
+        }
+    }
+    
+    if (callBtn) {
+        // 如果启用了CALL筛选，显示筛选后的数量和总数
+        if (filterState.callOnly) {
+            callBtn.innerHTML = `仅显示CALL <span class="layui-badge layui-bg-orange">${counts.call}/${counts.call}</span>`;
+        } else {
+            callBtn.innerHTML = `仅显示CALL <span class="layui-badge layui-bg-orange">${counts.call}</span>`;
+        }
+    }
+    
+    if (resetBtn) {
+        resetBtn.innerHTML = `重置筛选 <span class="layui-badge layui-bg-blue">${totalCount}</span>`;
+    }
 }
 
 function showChart(label, data, type) {
