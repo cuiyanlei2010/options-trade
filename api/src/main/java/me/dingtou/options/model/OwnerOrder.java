@@ -170,6 +170,30 @@ public class OwnerOrder implements Cloneable {
         }
     }
 
+    /**
+     * 获取订单逻辑编码 解决证券标的因为分红等原因调整代码的问题
+     * 
+     * @return 期权：底层标的+日期期+看涨看跌+行权价 股票：underlyingCode
+     */
+    public String logicCode() {
+        if (!OwnerOrder.isOptionsOrder(this)) {
+            return this.code;
+        }
+        // 格式化到期日为yyMMdd
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyMMdd");
+        String formattedDate = dateFormat.format(strikeTime);
+
+        // 确定看涨/看跌类型
+        String type = OwnerOrder.isCall(this) ? "C" : "P";
+
+        // 获取行权价并转换为整数（乘以1000）
+        BigDecimal strikePrice = OwnerOrder.strikePrice(this).multiply(BigDecimal.valueOf(1000));
+        String formattedStrikePrice = strikePrice.toBigInteger().toString();
+
+        // 拼接逻辑期权代码：标的代码 + 到期日 + 类型 + 行权价
+        return underlyingCode + formattedDate + type + formattedStrikePrice;
+    }
+
     @Override
     public OwnerOrder clone() {
         try {
@@ -212,6 +236,24 @@ public class OwnerOrder implements Cloneable {
             return false;
         } else {
             return "C".equals(matcher.group(3));
+        }
+    }
+
+    /**
+     * 获取订单类型
+     * 
+     * @param order 订单对象
+     * @return 订单类型代码，可能的值为"PUT", "CALL", 或"STOCK"
+     */
+    public static String codeType(OwnerOrder order) {
+        if (isPut(order)) {
+            return "PUT";
+        } else if (isCall(order)) {
+            return "CALL";
+        } else if (isStockOrder(order)) {
+            return "STOCK";
+        } else {
+            return "UNKNOWN";
         }
     }
 
@@ -361,9 +403,26 @@ public class OwnerOrder implements Cloneable {
      * @return 收益
      */
     public static BigDecimal income(OwnerOrder order) {
+        if (!OwnerOrder.isTraded(order)) {
+            return BigDecimal.ZERO;
+        }
+        // 修正收益
+        // put期权提前指派后，卖出被指派股票和被指派期权后，allOptionsIncome会失真，一部分收益是股票差价。
+        // * 例如：
+        // * BABA250627P130000 在股价117.05时被指派。
+        // * 接下来卖出100股BABA（117.05） + BABA250718P130000（13.45）
+        // * 实际收益(13.45+117.05-130)*100 = 50，但是系统会记录收益1345，因为卖了一张13.45的期权。
+        String manualIncome = order.getExtValue(OrderExt.MANUAL_INCOME);
+        if (null != manualIncome) {
+            return new BigDecimal(manualIncome);
+        }
+        int lotSize = lotSize(order);
+        if (OwnerOrder.isStockOrder(order)) {
+            lotSize = 1;
+        }
         return order.getPrice()
                 .multiply(new BigDecimal(order.getQuantity()))
-                .multiply(new BigDecimal(lotSize(order)))
+                .multiply(new BigDecimal(lotSize))
                 .multiply(new BigDecimal(TradeSide.of(order.getSide()).getSign()));
     }
 

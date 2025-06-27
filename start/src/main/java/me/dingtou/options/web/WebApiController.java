@@ -210,17 +210,6 @@ public class WebApiController {
         return WebResult.success(order);
     }
 
-    @RequestMapping(value = "/trade/order/draft", method = RequestMethod.GET)
-    public WebResult<List<OwnerOrder>> queryDraftOrder(
-            @RequestParam(value = "password", required = true) String password) throws Exception {
-        String owner = SessionUtils.getCurrentOwner();
-        log.info("query order draft. owner:{}, password:{}", owner, password);
-        if (!authService.auth(owner, password)) {
-            return WebResult.failure("验证码错误");
-        }
-        return WebResult.success(optionsQueryService.queryDraftOrder(owner));
-    }
-
     @RequestMapping(value = "/trade/close", method = RequestMethod.POST)
     public WebResult<OwnerOrder> close(@RequestParam(value = "price", required = true) String price,
             @RequestParam(value = "orderId", required = true) Long orderId,
@@ -248,28 +237,39 @@ public class WebApiController {
     }
 
     @RequestMapping(value = "/trade/sync", method = RequestMethod.GET)
-    public WebResult<Boolean> sync(@RequestParam(value = "password", required = true) String password)
+    public WebResult<Boolean> sync(@RequestParam(value = "password", required = false) String password)
             throws Exception {
         String owner = SessionUtils.getCurrentOwner();
-        log.info("trade sync. owner:{}", owner);
-        if (!authService.auth(owner, password)) {
-            return WebResult.failure("验证码错误");
+        log.info("trade sync. owner:{}, password:{}", owner, password);
+        if (StringUtils.isBlank(owner)) {
+            return WebResult.failure("未登录");
         }
         return WebResult.success(optionsTradeService.sync(owner));
+    }
+
+    @RequestMapping(value = "/trade/order/draft", method = RequestMethod.GET)
+    public WebResult<List<OwnerOrder>> queryDraftOrder(
+            @RequestParam(value = "password", required = false) String password) throws Exception {
+        String owner = SessionUtils.getCurrentOwner();
+        log.info("query order draft. owner:{}, password:{}", owner, password);
+        if (StringUtils.isBlank(owner)) {
+            return WebResult.failure("未登录");
+        }
+        return WebResult.success(optionsQueryService.queryDraftOrder(owner));
     }
 
     @RequestMapping(value = "/trade/update", method = RequestMethod.POST)
     public WebResult<Integer> updateOrderStrategy(
             @RequestParam(value = "strategyId", required = true) String strategyId,
-            @RequestParam(value = "orderIds", required = true) List<Long> orderIds,
+            @RequestParam(value = "orderIds", required = false) List<Long> orderIds,
             @RequestParam(value = "password", required = true) String password) throws Exception {
         String owner = SessionUtils.getCurrentOwner();
         log.info("trade update. owner:{}, strategyId:{}, orderIds:{}", owner, strategyId, orderIds);
         if (!authService.auth(owner, password)) {
             return WebResult.failure("验证码错误");
         }
-        if (orderIds.isEmpty()) {
-            return WebResult.success(0);
+        if (null == orderIds || orderIds.isEmpty()) {
+            return WebResult.failure("订单为空");
         }
         return WebResult.success(optionsTradeService.updateOrderStrategy(owner, orderIds, strategyId));
     }
@@ -286,6 +286,24 @@ public class WebApiController {
         }
         return WebResult.success(optionsTradeService.updateOrderStatus(owner, orderId, OrderStatus.of(status)));
     }
+    
+    @RequestMapping(value = "/trade/updateIncome", method = RequestMethod.POST)
+    public WebResult<Boolean> updateOrderIncome(
+            @RequestParam(value = "orderId", required = true) Long orderId,
+            @RequestParam(value = "manualIncome", required = true) String manualIncome,
+            @RequestParam(value = "password", required = true) String password) throws Exception {
+        String owner = SessionUtils.getCurrentOwner();
+        log.info("trade updateIncome. owner:{}, orderId:{}, manualIncome:{}", owner, orderId, manualIncome);
+        if (!authService.auth(owner, password)) {
+            return WebResult.failure("验证码错误");
+        }
+        try {
+            BigDecimal incomeValue = new BigDecimal(manualIncome);
+            return WebResult.success(optionsTradeService.updateOrderIncome(owner, orderId, incomeValue));
+        } catch (NumberFormatException e) {
+            return WebResult.failure("收益值格式错误");
+        }
+    }
 
     @RequestMapping(value = "/trade/updateStrategy", method = RequestMethod.POST)
     public WebResult<Boolean> updateOrderStrategy(
@@ -297,7 +315,8 @@ public class WebApiController {
         if (!authService.auth(owner, password)) {
             return WebResult.failure("验证码错误");
         }
-        return WebResult.success(optionsTradeService.updateOrderStrategy(owner, Collections.singletonList(orderId), strategyId) > 0);
+        return WebResult.success(
+                optionsTradeService.updateOrderStrategy(owner, Collections.singletonList(orderId), strategyId) > 0);
     }
 
 }

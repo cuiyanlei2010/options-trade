@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 策略汇总
@@ -24,19 +25,29 @@ public class StrategySummary {
     private BigDecimal strategyDelta;
 
     /**
-     * 策略总体Gamma
+     * 策略总体Options Delta
      */
-    private BigDecimal strategyGamma;
+    private BigDecimal optionsDelta;
 
     /**
-     * 策略总体Theta
+     * 策略总体Options Gamma
      */
-    private BigDecimal strategyTheta;
+    private BigDecimal optionsGamma;
 
     /**
-     * 策略方向(-100->0->100) 100=100%看多，-100=100%看空
+     * 策略总体Options Theta
      */
-    private BigDecimal strategyDirection;
+    private BigDecimal optionsTheta;
+
+    /**
+     * 策略未平仓的持有期权合约数
+     */
+    private BigDecimal openOptionsQuantity;
+
+    /**
+     * 平均Delta
+     */
+    private BigDecimal avgDelta;
 
     /**
      * 总手续费
@@ -44,12 +55,17 @@ public class StrategySummary {
     private BigDecimal totalFee;
 
     /**
-     * 期权总收益(已经扣除手续费)
+     * 期权总收益(未扣除手续费)
+     * 注意：put期权提前指派后，卖出被指派股票和被指派期权后，allOptionsIncome会失真，一部分收益是股票差价。
+     * 例如：
+     * BABA250627P130000 在股价117.05时被指派。
+     * 接下来卖出100股BABA（117.05） + BABA250718P130000（13.45）
+     * 实际收益(13.45+117.05-130)*100 = 50，但是系统会记录收益1345，因为卖了一张13.45的期权。
      */
     private BigDecimal allOptionsIncome;
 
     /**
-     * 总收入（期权总收益+股票盈亏）
+     * 策略所有交易总收益（已经扣除手续和初始化投资）
      */
     private BigDecimal allIncome;
 
@@ -97,4 +113,10 @@ public class StrategySummary {
      * 订单列表
      */
     private List<OwnerOrder> strategyOrders;
+
+    /**
+     * 订单分组
+     */
+    private Map<String, OwnerOrderGroup> orderGroups;
+
 }

@@ -224,7 +224,7 @@ public class OwnerManager {
 
         // 计算提交的交易单是否已经平仓用
         Map<String, List<OwnerOrder>> codeOrdersMap = ownerOrders.stream()
-                .collect(Collectors.groupingBy(OwnerOrder::getCode));
+                .collect(Collectors.groupingBy(OwnerOrder::logicCode));
         Map<String, Boolean> orderClose = new HashMap<>();
         for (Map.Entry<String, List<OwnerOrder>> codeOrders : codeOrdersMap.entrySet()) {
             String code = codeOrders.getKey();
@@ -244,25 +244,27 @@ public class OwnerManager {
         }
 
         for (OwnerOrder ownerOrder : ownerOrders) {
-            if (OwnerOrder.isOptionsOrder(ownerOrder)) {
-                // 订单收益
-                BigDecimal totalIncome = OwnerOrder.income(ownerOrder);
-                ownerOrder.setExtValue(OrderExt.TOTAL_INCOME, totalIncome);
-            }
 
             // 订单是否平仓
             boolean currentOrderClose = OwnerOrder.isClose(ownerOrder);
-            Boolean isClose = currentOrderClose || orderClose.getOrDefault(ownerOrder.getCode(), false);
+            Boolean isClose = currentOrderClose || orderClose.getOrDefault(ownerOrder.logicCode(), false);
             ownerOrder.setExtValue(OrderExt.IS_CLOSE, isClose);
 
+            // 订单标的类型 （Call、Put、Stock）
+            ownerOrder.setExtValue(OrderExt.CODE_TYPE, OwnerOrder.codeType(ownerOrder));
+            // 订单收益
+            BigDecimal totalIncome = OwnerOrder.income(ownerOrder);
+            ownerOrder.setExtValue(OrderExt.TOTAL_INCOME, NumberUtils.scale(totalIncome).toPlainString());
+
             if (OwnerOrder.isOptionsOrder(ownerOrder)) {
+
                 // 计算期权到期日ownerOrder.getStrikeTime()和now的间隔天数
                 long daysToExpiration = OwnerOrder.dte(ownerOrder);
                 ownerOrder.setExtValue(OrderExt.CUR_DTE, daysToExpiration);
 
                 // 计算期权行权价
                 BigDecimal strikePrice = OwnerOrder.strikePrice(ownerOrder);
-                ownerOrder.setExtValue(OrderExt.STRIKE_PRICE, strikePrice);
+                ownerOrder.setExtValue(OrderExt.STRIKE_PRICE, strikePrice.toPlainString());
 
                 // 计算期权合约数量
                 int lotSize = OwnerOrder.lotSize(ownerOrder);
@@ -304,7 +306,7 @@ public class OwnerManager {
         }
         List<OptionsRealtimeData> optionsBasicInfo = QueryExecutor.query(new FuncGetOptionsRealtimeData(securityList));
         if (optionsBasicInfo.isEmpty()) {
-            log.warn("query options basic info failed, retry");
+            log.warn("query FuncGetOptionsRealtimeData failed, retry");
             optionsBasicInfo = QueryExecutor.query(new FuncGetOptionsRealtimeData(securityList));
         }
         if (optionsBasicInfo.isEmpty()) {

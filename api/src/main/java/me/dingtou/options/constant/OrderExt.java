@@ -1,6 +1,5 @@
 package me.dingtou.options.constant;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 import com.alibaba.fastjson.JSON;
@@ -37,7 +36,7 @@ public enum OrderExt {
     /**
      * 总收益
      */
-    TOTAL_INCOME("totalIncome", BigDecimal.class),
+    TOTAL_INCOME("totalIncome", String.class),
 
     /**
      * 是否平仓（会计算多订单之间的买卖抵消）
@@ -76,7 +75,12 @@ public enum OrderExt {
     /**
      * 当前行权价
      */
-    STRIKE_PRICE("strikePrice", BigDecimal.class),
+    STRIKE_PRICE("strikePrice", String.class),
+
+    /**
+     * 标的类型
+     */
+    CODE_TYPE("codeType", String.class),
 
     /**
      * 是否是认沽订单
@@ -96,7 +100,12 @@ public enum OrderExt {
     /**
      * 来源期权
      */
-    SOURCE_OPTIONS("sourceOptions", Options.class);
+    SOURCE_OPTIONS("sourceOptions", Options.class),
+
+    /**
+     * 修正后的收益值
+     */
+    MANUAL_INCOME("manualIncome", String.class);
 
     private final String key;
     private final Class<?> classType;
@@ -123,7 +132,8 @@ public enum OrderExt {
         if (this.getClassType().isAssignableFrom(obj.getClass())) {
             return JSON.toJSONString(obj);
         }
-        throw new IllegalArgumentException("type not match: expected " + this.getClassType().getName() + ", but got " + obj.getClass().getName());
+        throw new IllegalArgumentException(
+                "type not match: expected " + this.getClassType().getName() + ", but got " + obj.getClass().getName());
     }
 
     public Object fromString(String str) {

@@ -15,9 +15,9 @@
         <div class="layui-logo layui-hide-xs layui-bg-black">Options</div>
         <!-- 头部区域（可配合layui 已有的水平导航） -->
         <ul class="layui-nav layui-layout-left">
-            <li class="layui-nav-item"><a href="index.html">标的分析</a></li>
+            <li class="layui-nav-item"><a href="analyze.html">标的分析</a></li>
             <li class="layui-nav-item layui-this"><a href="order.html">策略订单</a></li>
-            <li class="layui-nav-item"><a href="income.html">账户收益</a></li>
+            <li class="layui-nav-item"><a href="summary.html">账户汇总</a></li>
             <li class="layui-nav-item"><a href="assistant.html">AI 助手</a></li>
             <li class="layui-nav-item"><a href="sync.html">同步订单</a></li>
             <li class="layui-nav-item"><a href="admin.html">后台管理</a></li>
@@ -59,9 +59,9 @@
 </div>
 <script id="summary" type="text/html">
     <h4 class="layui-bg-gray">
-        {{ d.strategy.strategyName }} | <b>${{ d.allOptionsIncome }}</b> 
-        <b style="color: red;"> (Delta:{{ d.strategyDelta }}｜Gamma:{{ d.strategyGamma }}｜Theta:{{ d.strategyTheta }}) </b>
-        <span class="layui-badge layui-font-16">持股多空:{{ d.strategyDirection }}%</span>
+        {{ d.strategy.strategyName }} | <b>策略收益：${{ d.allIncome }}</b> | <b>期权收益：${{ d.allOptionsIncome }}</b> 
+        <b style="color: red;"> (策略Delta:{{ d.strategyDelta }}｜Delta:{{ d.optionsDelta }}｜Gamma:{{ d.optionsGamma }}｜Theta:{{ d.optionsTheta }}) </b>
+        <span class="layui-badge layui-font-16">{{ d.avgDelta }}</span>
     </h4>
     <ul class="layui-font-12">
         <li>
@@ -75,6 +75,7 @@
             <span class="layui-badge layui-bg-blue">
                 期权已到账收入:<b>${{ d.allOptionsIncome }}</b>(已扣除手续费<b>${{ d.totalFee }}</b>) 
                 | 未到期收入:<b>${{ d.unrealizedOptionsIncome }}</b>
+                | 未到期合约数:<b>{{ d.openOptionsQuantity }}</b>
             </span>
         </li>
         <li>
@@ -82,7 +83,7 @@
                 策略持有股票:<b>{{ d.holdStockNum }}</b> 
                 | 平均成本:<b>${{ d.averageStockCost }}</b> 
                 | 当前股价:<b>${{ d.currentStockPrice }}</b> 
-                | 股票花费:<b>${{ d.totalStockCost }}</b> 
+                | 股票支出:<b>${{ d.totalStockCost }}</b> 
                 | 股票盈亏:<b>${{ d.holdStockProfit }}</b>
             </span>
         </li>
@@ -106,6 +107,7 @@
         {{#  } }}
         <a class="layui-btn layui-btn-primary layui-btn-xs" lay-event="updateStatus">状态</a>
         <a class="layui-btn layui-btn-primary layui-btn-xs" lay-event="updateStrategy">策略</a>
+        <a class="layui-btn layui-btn-primary layui-btn-xs" lay-event="updateIncome">修正</a>
     </div>
 </script>
 <script type="text/html" id="TPL-colorStatus">

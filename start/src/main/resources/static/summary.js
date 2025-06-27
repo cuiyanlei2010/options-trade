@@ -30,6 +30,29 @@ function assistant(prompt, title) {
     }
 }
 
+function renderPositionTable(positions){
+    if(!positions){
+        return;
+    }
+    layui.use(['table'], function () {
+        const table = layui.table;
+        // 初始化表格
+        table.render({
+            elem: '#positionTable',
+            data: positions,
+            cols: [[
+                {field: 'securityCode', title: '代码', width: 220},
+                {field: 'securityName', title: '名称', width: 360},
+                {field: 'quantity', title: '持仓数量', width: 120},
+                {field: 'canSellQty', title: '可卖数量', width: 120},
+                {field: 'costPrice', title: '成本价', width: 120},
+                {field: 'currentPrice', title: '当前价', width: 120}
+            ]]
+        });
+    });
+
+}
+
 function renderOrderTable(orderList){
     if(!orderList){
         return;
@@ -70,6 +93,7 @@ function renderOrderTable(orderList){
             "statusStr": statusMapping(item.status+''),
             "curDTE": item.ext ? item.ext.curDTE : null,
             "strikePrice": item.ext ? item.ext.strikePrice : null,
+            "codeType": item.ext ? item.ext.codeType : null,
             "isPut": item.ext ? item.ext.isPut : false,
             "isCall": item.ext ? item.ext.isCall : false,
             "totalIncome": item.ext ? item.ext.totalIncome : null,
@@ -132,25 +156,28 @@ function renderOrderTable(orderList){
           }},
           {field: 'strategyName', title: '策略名称', width: 150, templet: function(d){
               if (d.ext && d.ext.strategyName && d.ext.strategyId) {
-                  return '<a href="javascript:void(0);" class="strategy-link" data-strategy-id="' + d.ext.strategyId + '">' + d.ext.strategyName + '</a>';
+                  return '<a href="javascript:void(0);" class="strategy-link table-link" data-strategy-id="' + d.ext.strategyId + '">' + d.ext.strategyName + '</a>';
               }
               return d.ext && d.ext.strategyName ? d.ext.strategyName : '-';
           }},
           {field: 'tradeTime', title: '交易时间', width: 165},
-          {field: 'strikeTime', title: '行权时间', width: 120},
           {field: 'code', title: '期权代码', width: 180},
-          {field: 'underlyingCode', title: '证券代码', width: 150, templet: function(d){
-                return `<span>${d.underlyingCode}</span><b name="stock_${d.market}_${d.underlyingCode}" class="current-price layui-badge"></b>`;
+          {field: 'underlyingCode', title: '证券代码', width: 90, templet: function(d){
+              return `<a href="analyze.html?code=${d.underlyingCode}&market=${d.market}&strikeTime=${d.strikeTime}" class="table-link">${d.underlyingCode}</a>`;
+          }},
+          {field: 'strikeTime', title: '行权时间', width: 120},
+          {field: 'codeType', title: '标的类型', width: 90},
+          {field: 'strikePrice', title: '行权价/现价', width: 120, templet: function(d){
+                return `<span>${d.strikePrice}</span><b name="stock_${d.market}_${d.underlyingCode}" class="current-price layui-badge"></b>`;
             }
           },
-          {field: 'strikePrice', title: '行权价', width: 80},
-          {field: 'curDTE', title: '剩余/天', width: 100, sort: true},
           {field: 'side', title: '类型', width: 80},
           {field: 'quantity', title: '合约数', width: 80},
+          {field: 'curDTE', title: '剩余/天', width: 100, sort: true},
           {field: 'statusStr', title: '状态', width: 100},
-          {field: 'price', title: '价格', width: 80},
-          {field: 'totalIncome', title: '收入', width: 80},
+          {field: 'price', title: '订单价', width: 80},
           {field: 'curPrice', title: '现价', width: 80},
+          {field: 'totalIncome', title: '总收入', width: 80},
           {field: 'orderFee', title: '订单费用', width: 100},
           {field: 'profitRatio', title: '盈亏', width: 80, templet: function(d){
               return '<span class="' + d.profitRatioClass + '">' + d.profitRatio + '</span>';
@@ -438,6 +465,7 @@ function reloadData(){
         laytpl(getTpl).render(result, function(html){
           view.innerHTML = html;
         });
+        renderPositionTable(result.positions);
         renderOrderTable(result.unrealizedOrders);
 
         // 准备月度收益数据
@@ -573,4 +601,3 @@ function closeSse() {
 window.onbeforeunload = function () {
     closeSse();
 };
-

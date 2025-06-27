@@ -27,6 +27,11 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-freemarker</artifactId>
+                <version>3.3.9</version>
+            </dependency>
+            <dependency>
                 <groupId>me.dingtou.options</groupId>
                 <artifactId>api</artifactId>
                 <version>${project.version}</version>
@@ -65,7 +70,7 @@
             <dependency>
                 <groupId>io.github.longportapp</groupId>
                 <artifactId>openapi-sdk</artifactId>
-                <version>LATEST</version>
+                <version>3.0.5</version>
             </dependency>
             <dependency>
                 <groupId>jakarta.servlet</groupId>

@@ -371,4 +371,40 @@ public class TradeManager {
         dbOrder.setUpdateTime(new Date());
         return ownerOrderDAO.updateById(dbOrder) > 0;
     }
+
+    /**
+     * 查询持仓
+     * 
+     * @param account 账户
+     * @param stockCodes 
+     * @return 持仓
+     */
+    public List<OwnerPosition> queryOwnerPosition(OwnerAccount account, List<String> stockCodes) {
+        List<OwnerPosition> positions = optionsTradeGateway.getPosition(account);
+        if (null == positions || positions.isEmpty()) {
+            return positions;
+        }
+        // 过滤头寸编码中含有的stockCodes的记录
+        if (stockCodes == null || stockCodes.isEmpty()) {
+            return positions;
+        }
+    
+        return positions.stream()
+                .filter(position -> stockCodes.stream()
+                        .anyMatch(code -> position.getSecurityCode().startsWith(code)))
+                .toList();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public boolean updateOrderIncome(String owner, Long orderId, BigDecimal manualIncome) {
+        OwnerOrder dbOrder = ownerOrderDAO.queryOwnerOrderById(owner, orderId);
+        if (dbOrder == null) {
+            return false;
+        }
+        
+        // 更新扩展属性中的手动收益
+        dbOrder.setExtValue(OrderExt.MANUAL_INCOME, manualIncome.toString());
+        dbOrder.setUpdateTime(new Date());
+        return ownerOrderDAO.updateById(dbOrder) > 0;
+    }
 }

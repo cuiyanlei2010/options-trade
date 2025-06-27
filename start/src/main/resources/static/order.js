@@ -231,16 +231,32 @@ function assistant(prompt, title) {
     }
 }
 
-function renderTable(orderList){
+function renderTable(result){
+    var orderList = result.strategyOrders;
     if(!orderList){
         return;
     }
 
+    // 生成分组颜色映射
+    var groupColors = {};
+    var colorIndex = 0;
+    var colors = ['#e6f7ff', '#f6ffed'];
+    
     var convertedData = orderList.map(item => {
+        // 获取分组ID，如果没有则使用默认分组
+        var groupId = result.orderGroups[item.platformOrderId]?.groupId || 'default';
+        
+        // 为每个分组分配颜色
+        if(!groupColors[groupId]) {
+            groupColors[groupId] = colors[colorIndex % colors.length];
+            colorIndex++;
+        }
+        
         return {
             "LAY_CHECKED": item.ext && "true" == item.ext.isClose ? false : true,
             "order": JSON.stringify(item),
             "id": item.id,
+            "_groupId": groupId, // 用于样式设置
             "strategyId": item.strategyId,
             "platformOrderId": item.platformOrderId,
             "platformOrderIdEx": item.platformOrderIdEx,
@@ -271,13 +287,23 @@ function renderTable(orderList){
       var inst = table.render({
         elem: '#result',
         cols: [[
-          {field: 'order', title: '操作', width: 220, templet: '#TPL-orderOp'},
+          {field: 'order', title: '操作', width: 280, templet: '#TPL-orderOp'},
           {field: 'curDTE', title: '关注', width: 50, align: 'center', templet: '#TPL-colorStatus'},
+          {field: 'underlyingCode', title: '标的代码', width: 90, templet: function(d){
+              return `<a href="analyze.html?code=${d.underlyingCode}&market=${d.market}&strikeTime=${d.strikeTime}" class="layui-btn layui-btn-primary layui-btn-xs">${d.underlyingCode}</a>`;
+          }},
           {field: 'code', title: '证券代码', width: 180},
           {field: 'side', title: '类型', width: 80},
           {field: 'price', title: '价格', width: 85},
           {field: 'quantity', title: '数量', width: 80},
-          {field: 'totalIncome', title: '收入', width: 100},
+          {field: 'groupId', title: '分组收益', width: 130, templet: function(d){
+              // 分组收益 title修改时需要同步修改done方法中名字，否则合并单元格会失败
+              return `<div title="分组订单数:${result.orderGroups[d._groupId].orderCount}">收益:${result.orderGroups[d._groupId].totalIncome}<br/>费用:${result.orderGroups[d._groupId].totalOrderFee}</div>`;
+          }},
+          {field: 'totalIncome', title: '订单收益', width: 100},
+          {field: 'manualIncome', title: '是否修正', width: 100, templet: function(d){
+              return d.ext && d.ext.manualIncome ? '是' : '-';
+          }},
           {field: 'orderFee', title: '订单费用', width: 100},
           {field: 'strikeTime', title: '行权时间', width: 120, sort: true},
           {field: 'tradeTime', title: '交易时间', width: 165, sort: true},
@@ -293,6 +319,55 @@ function renderTable(orderList){
         data: convertedData,
         toolbar: true,
         lineStyle: 'height: 100%;',
+        done: function(res, curr, count){
+          // 设置分组行样式
+          $('.layui-table-body tr').each(function(){
+            var data = table.cache.result[$(this).data('index')];
+            if(data && data._groupId) {
+              $(this).css('background-color', groupColors[data._groupId]);
+            }
+          });
+
+          // 动态查找"分组收益"列的索引
+          var groupIncomeColIdx = -1;
+          $('.layui-table-header th').each(function(idx){
+            if ($(this).text().replace(/\s/g, '') === '分组收益') {
+              groupIncomeColIdx = idx;
+            }
+          });
+          if (groupIncomeColIdx === -1) return; // 没找到直接返回
+
+          // 合并_groupId相同的"分组收益"列
+          var $trs = $('.layui-table-body tr');
+          var lastGroupId = null, groupStartIdx = 0, groupCount = 0;
+          $trs.each(function(idx){
+            var data = table.cache.result[$(this).data('index')];
+            var groupId = data ? data._groupId : null;
+            if(groupId !== lastGroupId && lastGroupId !== null){
+              // 合并上一组
+              if(groupCount > 1){
+                var $firstTd = $trs.eq(groupStartIdx).find('td').eq(groupIncomeColIdx);
+                $firstTd.attr('rowspan', groupCount);
+                for(var i=1;i<groupCount;i++){
+                  $trs.eq(groupStartIdx+i).find('td').eq(groupIncomeColIdx).hide();
+                }
+              }
+              groupStartIdx = idx;
+              groupCount = 1;
+            }else{
+              groupCount++;
+            }
+            lastGroupId = groupId;
+          });
+          // 合并最后一组
+          if(groupCount > 1){
+            var $firstTd = $trs.eq(groupStartIdx).find('td').eq(groupIncomeColIdx);
+            $firstTd.attr('rowspan', groupCount);
+            for(var i=1;i<groupCount;i++){
+              $trs.eq(groupStartIdx+i).find('td').eq(groupIncomeColIdx).hide();
+            }
+          }
+        },
         defaultToolbar: [
           'filter', 'exports', 'print'
         ],
@@ -327,6 +402,8 @@ function renderTable(orderList){
             updateOrderStatus(data.id);
         } else if (event === 'updateStrategy') {
             updateOrderStrategy(data.id);
+        } else if (event === 'updateIncome') {
+            updateOrderIncome(data.id, data.ext && data.ext.totalIncome ? data.ext.totalIncome : "0");
         }
       });
     });
@@ -339,7 +416,7 @@ function getStrategyNameById(strategyId) {
     var strategy = strategyList.find(function(item) {
         return item.strategyId === strategyId;
     });
-    
+
     return strategy ? strategy.strategyName : "未知策略";
 }
 
@@ -379,7 +456,7 @@ function loadStrategyOrder(strategyId){
                 document.getElementById('title').innerHTML = html;
             });
             
-            renderTable(result.strategyOrders);
+            renderTable(result);
           },
           error: function() {
             layer.msg('获取策略数据失败');
@@ -466,6 +543,48 @@ function reloadData(){
       error: function() {
         layer.msg('获取数据失败');
       }
+    });
+}
+
+function updateOrderIncome(orderId, currentIncome) {
+    layer.prompt({
+        title: '请输入修正的收益值',
+        value: currentIncome,
+        formType: 0 // 0 表示文本输入
+    }, function(value, index, elem) {
+        if (value === '') {
+            layer.msg('收益值不能为空');
+            return elem.focus();
+        }
+        
+        // 验证是否为有效数字
+        if (isNaN(parseFloat(value))) {
+            layer.msg('请输入有效的数字');
+            return elem.focus();
+        }
+        
+        var loadingIndex = layer.load(1, {shade: [0.1, '#fff']});
+        $.ajax({
+            url: "/trade/updateIncome",
+            method: 'POST',
+            data: {
+                password: $("#totp").val(),
+                orderId: orderId,
+                manualIncome: value
+            },
+            success: function(response) {
+                layer.close(loadingIndex);
+                layer.msg(response.success ? '收益更新成功' : response.message);
+                if (response.success && currentStrategyId) {
+                    loadStrategyOrder(currentStrategyId);
+                }
+                layer.close(index);
+            },
+            error: function() {
+                layer.close(loadingIndex);
+                layer.msg('更新失败，请重试');
+            }
+        });
     });
 }
 
