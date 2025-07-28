@@ -1,4 +1,4 @@
-package me.dingtou.options.service.impl;
+package me.dingtou.options.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -28,7 +28,6 @@ import me.dingtou.options.manager.TradeManager;
 import me.dingtou.options.model.Options;
 import me.dingtou.options.model.OptionsRealtimeData;
 import me.dingtou.options.model.OptionsStrikeDate;
-import me.dingtou.options.model.Owner;
 import me.dingtou.options.model.OwnerAccount;
 import me.dingtou.options.model.OwnerOrder;
 import me.dingtou.options.model.OwnerOrderGroup;
@@ -40,7 +39,6 @@ import me.dingtou.options.model.SecurityQuote;
 import me.dingtou.options.model.StockIndicator;
 import me.dingtou.options.model.StrategyExt;
 import me.dingtou.options.model.StrategySummary;
-import me.dingtou.options.service.SummaryService;
 import me.dingtou.options.strategy.OrderTradeStrategy;
 import me.dingtou.options.strategy.order.DefaultTradeStrategy;
 

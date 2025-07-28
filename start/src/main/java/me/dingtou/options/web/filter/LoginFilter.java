@@ -2,7 +2,6 @@ package me.dingtou.options.web.filter;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
-import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -20,16 +19,16 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-
 import javax.crypto.SecretKey;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.alibaba.fastjson.JSON;
 
 @Slf4j
 public class LoginFilter implements Filter {
 
     public static final String JWT = "jwt";
-    public static final String OWNER = "owner";
     private final AuthService authService;
     private final int cookieMaxAgeDays;
 
@@ -44,7 +43,13 @@ public class LoginFilter implements Filter {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
         HttpServletResponse httpResponse = (HttpServletResponse) response;
         httpResponse.setCharacterEncoding("UTF-8");
-        LoginInfo loginInfo = getLoginInfo(httpRequest, httpResponse);
+        String apiKey = httpRequest.getHeader("apiKey");
+
+        // header auth
+        LoginInfo loginInfo = jwtLogin(apiKey);
+        if (null == loginInfo) {
+            loginInfo = getLoginInfo(httpRequest, httpResponse);
+        }
         if (null == loginInfo || !checkLoginInfo(loginInfo)) {
             httpResponse.setContentType("text/html; charset=utf-8");
             httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
@@ -109,7 +114,19 @@ public class LoginFilter implements Filter {
                 }
             }
 
-            return loginFromCookie(httpRequest.getCookies());
+            Cookie[] cookies = httpRequest.getCookies();
+            if (null == cookies) {
+                return null;
+            }
+
+            for (Cookie cookie : cookies) {
+                if (JWT.equals(cookie.getName())) {
+                    return jwtLogin(cookie.getValue());
+                }
+            }
+
+            return null;
+
         } catch (Exception ex) {
             log.error("getLoginInfo error.", ex);
             return null;
@@ -118,29 +135,19 @@ public class LoginFilter implements Filter {
     }
 
     /**
-     * 从cookie中获取登录信息
-     *
-     * @param cookies cookies
-     * @return LoginInfo
+     * jwt登录
+     * 
+     * @param jwtStr jwt
+     * @return 登录信息
      */
-    private LoginInfo loginFromCookie(Cookie[] cookies) {
-        if (null == cookies) {
+    private LoginInfo jwtLogin(String jwtStr) {
+        String owner = decodeJwtOwner(jwtStr);
+        if (StringUtils.isBlank(owner)) {
             return null;
         }
-        Map<String, String> cookieMap = new HashMap<>();
-        for (Cookie cookie : cookies) {
-            cookieMap.put(cookie.getName(), cookie.getValue());
-        }
-        if (!cookieMap.containsKey(OWNER) || !cookieMap.containsKey(JWT)) {
-            return null;
-        }
-        String owner = cookieMap.get(OWNER);
-        String jwtStr = cookieMap.get(JWT);
-
         String secretKey = authService.secretKeySha256(owner);
         try {
             SecretKey key = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
-
             JwtParser jwtParser = Jwts.parser()
                     // 设置签名的秘钥
                     .verifyWith(key)
@@ -156,39 +163,50 @@ public class LoginFilter implements Filter {
     }
 
     /**
+     * 解析JWT 获取sub属性
+     * 
+     * @param jwtStr jwt
+     * @return sub
+     */
+    private String decodeJwtOwner(String jwtStr) {
+        if (jwtStr == null || jwtStr.isEmpty()) {
+            return "";
+        }
+
+        // 分割JWT获取payload部分
+        String[] parts = jwtStr.split("\\.");
+        if (parts.length < 2) {
+            return ""; // 无效JWT
+        }
+
+        String payload = parts[1];
+        try {
+            // Base64URL解码
+            byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);
+            String payloadJson = new String(decodedBytes, StandardCharsets.UTF_8);
+            return JSON.parseObject(payloadJson).getString("sub");
+        } catch (Exception e) {
+            log.error("decodeJwtOwner error, jwtStr:{}", jwtStr, e);
+            return "";
+        }
+    }
+
+    /**
      * 保存cookie
      *
      * @param httpResponse
      * @param loginInfo
      */
     private void saveCookie(HttpServletResponse httpResponse, LoginInfo loginInfo) {
-        String secretKeySha256 = authService.secretKeySha256(loginInfo.getOwner());
-        SecretKey key = Keys.hmacShaKeyFor(secretKeySha256.getBytes(StandardCharsets.UTF_8));
-
         int oneDay = 24 * 60 * 60;
-        // 设置jwt的body
-        JwtBuilder builder = Jwts.builder()
-                .signWith(key)
-                .subject(loginInfo.getOwner())
-                .issuedAt(new Date())
-                // 设置过期时间
-                .expiration(new Date(System.currentTimeMillis() + oneDay * cookieMaxAgeDays * 1000L));
-
-        String jwt = builder.compact();
+        String jwt = authService.jwt(loginInfo.getOwner(),
+                new Date(System.currentTimeMillis() + oneDay * cookieMaxAgeDays * 1000L));
         Cookie jwtCookie = new Cookie(JWT, jwt);
         jwtCookie.setSecure(true);
         jwtCookie.setPath("/");
         jwtCookie.setHttpOnly(true);
         jwtCookie.setMaxAge(oneDay * cookieMaxAgeDays);
-
-        Cookie ownerCookie = new Cookie(OWNER, loginInfo.getOwner());
-        ownerCookie.setSecure(true);
-        ownerCookie.setPath("/");
-        ownerCookie.setHttpOnly(true);
-        ownerCookie.setMaxAge(oneDay * cookieMaxAgeDays);
-
         httpResponse.addCookie(jwtCookie);
-        httpResponse.addCookie(ownerCookie);
     }
 
     /**

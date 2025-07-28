@@ -1,35 +1,21 @@
 package me.dingtou.options.service;
 
 import me.dingtou.options.model.OwnerChatRecord;
-import me.dingtou.options.model.Message;
-
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 
 /**
  * AI服务
  * 
  * @author qiyan
  */
-public interface AIChatService {
+public interface AssistantService {
 
-    /**
-     * 聊天（带标题）
-     * 
-     * @param owner     所有者
-     * @param sessionId 会话ID
-     * @param title     标题（股票+策略）
-     * @param messages  消息列表
-     * @param callback  回调
-     */
-    void chat(String owner, String sessionId, String title, List<Message> messages, Function<Message, Void> callback);
-    
     /**
      * 获取AI设置
      * 
      * @param owner 所有者
-     * @return 设置键值对（systemPrompt, temperature）
+     * @return 设置键值对（mcpSettings, temperature）
      */
     Map<String, Object> getSettings(String owner);
 
@@ -39,17 +25,36 @@ public interface AIChatService {
      * @param owner 所有者
      * @param limit 限制数量
      * @return 会话列表
-     */ 
+     */
     List<OwnerChatRecord> summaryChatRecord(String owner, int limit);
 
     /**
-     * 根据会话ID获取沟通记录
+     * 根据会话ID获取沟通记录(user & assistant)
      *
      * @param owner     所有者
      * @param sessionId 会话ID
      * @return 沟通记录列表
      */
     List<OwnerChatRecord> listRecordsBySessionId(String owner, String sessionId);
+
+    /**
+     * 根据消息ID获取沟通记录
+     * 
+     * @param owner     所有者
+     * @param messageId 消息ID
+     * @return 沟通记录
+     */
+    OwnerChatRecord getRecordByMessageId(String owner, String messageId);
+
+    /**
+     * 添加沟通记录
+     *
+     * @param owner     所有者
+     * @param sessionId 会话ID
+     * @param record    消息记录
+     * @return 添加结果
+     */
+    Boolean addChatRecord(String owner, String sessionId, OwnerChatRecord record);
 
     /**
      * 删除会话记录
@@ -73,10 +78,10 @@ public interface AIChatService {
     /**
      * 更新AI设置
      *
-     * @param owner        所有者
-     * @param systemPrompt 系统提示词
-     * @param temperature  温度参数
+     * @param owner       所有者
+     * @param mcpSettings MCP服务器配置
+     * @param temperature 温度参数
      * @return 是否成功
      */
-    boolean updateSettings(String owner, String systemPrompt, Double temperature);
+    boolean updateSettings(String owner, String mcpSettings, Double temperature);
 }

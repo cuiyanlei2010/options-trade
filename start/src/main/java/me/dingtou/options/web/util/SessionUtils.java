@@ -45,7 +45,6 @@ public class SessionUtils {
         CURRENT_OWNER.remove();
     }
 
-
     /**
      * 获取登陆用户
      *
@@ -56,7 +55,6 @@ public class SessionUtils {
         return SESSION_OWNER.get(owner);
     }
 
-
     /**
      * 登陆
      *
@@ -65,7 +63,6 @@ public class SessionUtils {
     public static void login(LoginInfo loginInfo) {
         SESSION_OWNER.put(loginInfo.getOwner(), loginInfo);
     }
-
 
     /**
      * 创建sse连接
@@ -84,7 +81,6 @@ public class SessionUtils {
         return sseemitter;
     }
 
-
     /**
      * 获取sse连接
      *
@@ -95,7 +91,6 @@ public class SessionUtils {
     public static SseEmitter getConnect(String owner, String requestId) {
         return SSE_EMITTER_MAP.get(buildUniqueKey(owner, requestId));
     }
-
 
     /**
      * 关闭sse连接

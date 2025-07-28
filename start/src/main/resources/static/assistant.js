@@ -18,7 +18,7 @@ layui.use(['layer', 'form', 'util'], function() {
             
             // 默认设置
             this.settings = {
-                systemPrompt: "",
+                mcpSettings: "",
                 temperature: 0.1
             };
             
@@ -36,7 +36,7 @@ layui.use(['layer', 'form', 'util'], function() {
                 saveTitleBtn: document.getElementById('save-title-btn'),
                 toggleHistoryBtn: document.getElementById('toggle-history-btn'),
                 titleActions: document.getElementById('title-actions'),
-                systemPrompt: document.getElementById('system-prompt'),
+                mcpSettings: document.getElementById('mcp-settings'),
                 saveSettingsBtn: document.getElementById('save-settings-btn'),
                 resetSettingsBtn: document.getElementById('reset-settings-btn')
             };
@@ -55,14 +55,15 @@ layui.use(['layer', 'form', 'util'], function() {
             this.initSlider();
             this.bindEvents();
             this.loadPrompt();
-            
+            this.initChatModeFromUrl();
+
             // 监听窗口大小变化，确保滚动正常工作
             window.addEventListener('resize', () => {
                 // 重新检查聊天历史滚动条
                 setTimeout(() => this.scrollToBottom(), 200);
             });
         }
-
+        
         /**
          * 加载提示词
          */
@@ -112,6 +113,26 @@ layui.use(['layer', 'form', 'util'], function() {
         /**
          * 绑定事件处理
          */
+        /**
+         * 从URL参数初始化聊天模式
+         */
+        initChatModeFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const mode = urlParams.get('mode') || 'agent'; // 默认agent模式
+            const modeSelect = document.getElementById('chat-mode');
+            
+            if (['ask', 'agent'].includes(mode.toLowerCase())) {
+                modeSelect.value = mode.toLowerCase();
+            } else {
+                modeSelect.value = 'agent'; // 无效值默认agent模式
+            }
+            
+            // 重新渲染layui的select组件，确保显示更新
+            if (window.layui && window.layui.form) {
+                window.layui.form.render('select');
+            }
+        }
+
         bindEvents() {
             // 发送消息
             this.elements.sendBtn.addEventListener('click', () => this.sendMessage());
@@ -150,14 +171,6 @@ layui.use(['layer', 'form', 'util'], function() {
             
             // 重置AI设置
             this.elements.resetSettingsBtn.addEventListener('click', () => this.resetSettings());
-            
-            // 按Enter键发送消息
-            this.elements.chatInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    this.sendMessage();
-                }
-            });
             
             // 标题输入框变化时显示保存按钮
             this.elements.chatTitle.addEventListener('input', () => {
@@ -573,7 +586,7 @@ layui.use(['layer', 'form', 'util'], function() {
             }
             
             // 滚动到底部
-            this.scrollToBottom();
+            // this.scrollToBottom();
         }
         
         /**
@@ -649,11 +662,15 @@ layui.use(['layer', 'form', 'util'], function() {
             // 显示AI正在输入的指示器
             this.showTypingIndicator();
             
+            // 获取选择的模式
+            const mode = document.getElementById('chat-mode').value;
+            
             // 构建请求参数
             const params = new URLSearchParams({
                 requestId: this.currentClientId,
                 title: title || '未命名会话',
-                message: message
+                message: message,
+                mode: mode  // 添加模式参数
             });
             
             // 如果有会话ID，添加到参数中
@@ -661,8 +678,12 @@ layui.use(['layer', 'form', 'util'], function() {
                 params.append('sessionId', this.currentSessionId);
             }
             
-            // 确定请求endpoint
-            const endpoint = this.currentSessionId ? '/ai/chat/continue' : '/ai/chat';
+        // 确定请求endpoint
+        const endpoint = this.currentSessionId ? '/ai/continue' : '/ai/chat';
+        
+        // 添加模式到请求路径（如果需要）
+        // const endpointWithMode = `${endpoint}?mode=${mode}`;
+        // 注意：我们已将模式放在请求体中，所以不需要修改URL
             
             // 发送请求
             fetch(endpoint, {
@@ -805,12 +826,12 @@ layui.use(['layer', 'form', 'util'], function() {
             .then(result => {
                 if (result.success) {
                     this.settings = {
-                        systemPrompt: result.data.systemPrompt || "",
+                        mcpSettings: result.data.mcpSettings || "",
                         temperature: result.data.temperature || 0.1
                     };
                     
                     // 更新UI
-                    this.elements.systemPrompt.value = this.settings.systemPrompt;
+                    this.elements.mcpSettings.value = this.settings.mcpSettings;
                     if (this.temperatureSlider) {
                         this.temperatureSlider.setValue(this.settings.temperature);
                         document.querySelector('.slider-value').textContent = this.settings.temperature.toFixed(1);
@@ -853,14 +874,13 @@ layui.use(['layer', 'form', 'util'], function() {
          * 保存AI设置
          */
         saveSettings() {
-            // 获取系统提示词
-            const systemPrompt = this.elements.systemPrompt.value.trim();
+            // 获取系MCP服务器配置
+            const mcpSettings = this.elements.mcpSettings.value.trim();
             
             // 更新设置
-            this.settings.systemPrompt = systemPrompt;
+            this.settings.mcpSettings = mcpSettings;
             
-            // 保存到本地和服务端
-            localStorage.setItem('ai_settings', JSON.stringify(this.settings));
+            // 保存到服务端
             this.saveSettingsToServer();
         }
         
@@ -874,7 +894,7 @@ layui.use(['layer', 'form', 'util'], function() {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    systemPrompt: this.settings.systemPrompt,
+                    mcpSettings: this.settings.mcpSettings,
                     temperature: this.settings.temperature
                 })
             })
@@ -898,7 +918,7 @@ layui.use(['layer', 'form', 'util'], function() {
         resetSettings() {
             // 默认设置
             const defaultSettings = {
-                systemPrompt: "",
+                mcpSettings: "",
                 temperature: 0.1
             };
             
@@ -910,7 +930,7 @@ layui.use(['layer', 'form', 'util'], function() {
                 this.settings = { ...defaultSettings };
                 
                 // 更新UI
-                this.elements.systemPrompt.value = this.settings.systemPrompt;
+                this.elements.mcpSettings.value = this.settings.mcpSettings;
                 this.temperatureSlider.setValue(this.settings.temperature);
                 
                 // 保存到localStorage
@@ -923,7 +943,7 @@ layui.use(['layer', 'form', 'util'], function() {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        systemPrompt: this.settings.systemPrompt,
+                        mcpSettings: this.settings.mcpSettings,
                         temperature: this.settings.temperature
                     })
                 })
