@@ -48,6 +48,7 @@
                         <li class="layui-this">期权标的管理</li>
                         <li>期权策略管理</li>
                         <li>账户管理</li>
+                        <li>知识库管理</li>
                     </ul>
                     <div class="layui-tab-content">
                         <!-- 期权标的管理 -->
@@ -112,6 +113,27 @@
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- 知识库管理 -->
+                        <div class="layui-tab-item">
+                            <div class="layui-card">
+                                <div class="layui-card-header">知识库管理</div>
+                                <div class="layui-card-body">
+                                    <div class="layui-btn-group">
+                                        <button type="button" class="layui-btn layui-btn-sm" id="addKnowledgeBtn">
+                                            <i class="layui-icon">&#xe654;</i> 添加知识
+                                        </button>
+                                        <button type="button" class="layui-btn layui-btn-sm layui-btn-danger" id="deleteKnowledgeBtn">
+                                            <i class="layui-icon">&#xe640;</i> 删除
+                                        </button>
+                                        <button type="button" class="layui-btn layui-btn-sm layui-btn-normal" id="refreshKnowledgeBtn">
+                                            <i class="layui-icon">&#xe669;</i> 刷新
+                                        </button>
+                                    </div>
+                                    <table id="knowledgeTable" lay-filter="knowledgeTable"></table>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -136,6 +158,13 @@
     <script type="text/html" id="accountTableBar">
         <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
         <a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="delete">删除</a>
+    </script>
+    
+    <!-- 知识库表格操作按钮 -->
+    <script type="text/html" id="knowledgeTableBar">
+        <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
+        <a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="delete">删除</a>
+        <a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="toggle">{{d.status === 1 ? '禁用' : '启用'}}</a>
     </script>
 
     <!-- 期权标的编辑表单 -->
@@ -174,10 +203,58 @@
                 </div>
             </div>
         </form>
-    </script>
+            </script>
 
-    <!-- 期权策略编辑表单 -->
-    <script type="text/html" id="strategyFormTpl">
+            <!-- 知识库编辑表单 -->
+            <script type="text/html" id="knowledgeFormTpl">
+                <form class="layui-form" id="knowledgeForm" lay-filter="knowledgeForm" style="padding: 20px;">
+                    <input type="hidden" name="id">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">标题</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="title" required lay-verify="required" placeholder="请输入标题" autocomplete="off" class="layui-input">
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">类型</label>
+                        <div class="layui-input-block">
+                            <select name="type" lay-verify="required">
+                                <option value="">请选择类型</option>
+                                <option value="1">期权策略知识</option>
+                                <option value="2">规则知识</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">描述</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="description" placeholder="请输入描述" autocomplete="off" class="layui-input">
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">内容</label>
+                        <div class="layui-input-block">
+                            <textarea name="content" placeholder="请输入内容（支持Markdown）" class="layui-textarea" style="height: 200px;"></textarea>
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">状态</label>
+                        <div class="layui-input-block">
+                            <input type="radio" name="status" value="1" title="启用" checked>
+                            <input type="radio" name="status" value="0" title="禁用">
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <div class="layui-input-block">
+                            <button class="layui-btn" lay-submit lay-filter="knowledgeSubmit">立即提交</button>
+                            <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+                        </div>
+                    </div>
+                </form>
+            </script>
+
+            <!-- 期权策略编辑表单 -->
+            <script type="text/html" id="strategyFormTpl">
         <form class="layui-form" id="strategyForm" lay-filter="strategyForm" style="padding: 20px;">
             <input type="hidden" name="id">
             <input type="hidden" name="ext" value="{}">
@@ -298,101 +375,9 @@
                 </div>
             </div>
 
-            <!-- 分析配置 -->
-            <fieldset class="layui-elem-field layui-field-title">
-                <legend>分析配置</legend>
-            </fieldset>
-            <div class="layui-form-item">
-                <label class="layui-form-label">K线周期</label>
-                <div class="layui-input-block">
-                    <select id="kline_period" name="kline_period" lay-filter="kline_period">
-                        <option value="WEEK">周K线</option>
-                        <option value="DAY">日K线</option>
-                    </select>
-                </div>
-            </div>
-            
-            <!-- 资金规模配置 -->
-            <fieldset class="layui-elem-field layui-field-title">
-                <legend>资金规模配置</legend>
-            </fieldset>
-            <div class="layui-form-item">
-                <label class="layui-form-label">资金规模</label>
-                <div class="layui-input-block">
-                    <input type="number" id="account_size" required lay-verify="required" placeholder="请输入资金规模（元）" autocomplete="off" class="layui-input">
-                </div>
-            </div>
-            <div class="layui-form-item">
-                <label class="layui-form-label">保证金比例</label>
-                <div class="layui-input-block">
-                    <input type="number" id="margin_ratio" required lay-verify="required" placeholder="请输入保证金比例（1=100%）" autocomplete="off" class="layui-input" value="1">
-                </div>
-            </div>
-            
-            <div class="layui-form-item">
-                <label class="layui-form-label">头寸比例</label>
-                <div class="layui-input-block">
-                    <input type="number" id="position_ratio" required lay-verify="required" placeholder="请输入每笔交易的头寸比例（0.1=10%）" autocomplete="off" class="layui-input" value="0.1">
-                </div>
-            </div>
-            
-            <!-- 长桥平台配置 -->
-            <fieldset class="layui-elem-field layui-field-title">
-                <legend>长桥平台配置</legend>
-            </fieldset>
-            <div class="layui-form-item">
-                <label class="layui-form-label">App Key</label>
-                <div class="layui-input-block">
-                    <input type="text" id="longport_app_key" placeholder="请输入App Key" autocomplete="off" class="layui-input">
-                </div>
-            </div>
-            <div class="layui-form-item">
-                <label class="layui-form-label">App Secret</label>
-                <div class="layui-input-block">
-                    <input type="text" id="longport_app_secret" placeholder="请输入App Secret" autocomplete="off" class="layui-input">
-                </div>
-            </div>
-            <div class="layui-form-item">
-                <label class="layui-form-label">Access Token</label>
-                <div class="layui-input-block">
-                    <input type="text" id="longport_access_token" placeholder="请输入Access Token" autocomplete="off" class="layui-input">
-                </div>
-            </div>
-            
-            <!-- AI配置 -->
-            <fieldset class="layui-elem-field layui-field-title">
-                <legend>AI配置</legend>
-            </fieldset>
-            <div class="layui-form-item">
-                <label class="layui-form-label">Base URL</label>
-                <div class="layui-input-block">
-                    <input type="text" id="ai_base_url" placeholder="请输入Base URL" autocomplete="off" class="layui-input" value="https://dashscope.aliyuncs.com/compatible-mode/v1">
-                </div>
-            </div>
-            <div class="layui-form-item">
-                <label class="layui-form-label">API Model</label>
-                <div class="layui-input-block">
-                    <input type="text" id="ai_api_model" placeholder="请输入API Model" autocomplete="off" class="layui-input" value="deepseek-r1">
-                </div>
-            </div>
-            <div class="layui-form-item">
-                <label class="layui-form-label">API Key</label>
-                <div class="layui-input-block">
-                    <input type="text" id="ai_api_key" placeholder="请输入API Key" autocomplete="off" class="layui-input">
-                </div>
-            </div>
-            <div class="layui-form-item">
-                <label class="layui-form-label">Temperature</label>
-                <div class="layui-input-block">
-                    <input type="text" id="ai_api_temperature" placeholder="请输入Temperature" autocomplete="off" class="layui-input" value="1.0">
-                </div>
-            </div>
-            <div class="layui-form-item">
-                <label class="layui-form-label">MCP服务器配置</label>
-                <div class="layui-input-block">
-                    <textarea id="ai_mcp_settings" placeholder="请输入MCP服务器配置" class="layui-textarea" rows="4"></textarea>
-                    <div class="layui-form-mid layui-word-aux">MCP服务器配置</div>
-                </div>
+            <!-- 扩展字段配置 -->
+            <div id="accountExtFields">
+                <!-- 动态渲染的扩展字段将在这里显示 -->
             </div>
             
             <div class="layui-form-item">
@@ -408,4 +393,4 @@
     <script src="common.js"></script>
     <script src="admin.js"></script>
 </body>
-</html> 
+</html>

@@ -17,8 +17,8 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
         defaultToolbar: ['filter', 'exports', 'print'],
         cols: [[
             {type: 'checkbox'},
-            {field: 'id', title: 'ID', sort: true, width: 80},
-            {field: 'name', title: '标的名称', width: 120},
+            {field: 'id', title: 'ID', sort: true, width: 200},
+            {field: 'name', title: '标的名称', width: 200},
             {field: 'code', title: '标的代码', width: 100},
             {field: 'market', title: '市场', width: 80},
             {
@@ -30,17 +30,9 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
             {
                 field: 'status', title: '状态', width: 80,
                 templet: function (d) {
-                    return d.status === 1 ? 
-                        '<span class="layui-badge layui-bg-green">启用</span>' : 
+                    return d.status === 1 ?
+                        '<span class="layui-badge layui-bg-green">启用</span>' :
                         '<span class="layui-badge layui-bg-gray">禁用</span>';
-                }
-            },
-            {
-                field: 'totalRatio', 
-                title: '总规模占比', 
-                width: 100, 
-                templet: function(d){
-                    return (d.totalRatio * 100).toFixed(1) + '%';
                 }
             },
             {title: '操作', toolbar: '#securityTableBar', width: 180}
@@ -60,10 +52,10 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
 
     // 期权策略表格
     let strategyTable;
-    
+
     // 账户表格
     let accountTable;
-    
+
     // 初始化策略表格
     function initStrategyTable() {
         strategyTable = table.render({
@@ -74,7 +66,7 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
             defaultToolbar: ['filter', 'exports', 'print'],
             cols: [[
                 {type: 'checkbox'},
-                {field: 'id', title: 'ID', sort: true, width: 50},
+                {field: 'id', title: 'ID', sort: true, width: 200},
                 {field: 'strategyName', title: '策略名称', width: 200},
                 {field: 'strategyCode', title: '策略代码', width: 160},
                 {field: 'stage', title: '策略阶段', width: 100},
@@ -106,8 +98,8 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                 {
                     field: 'status', title: '状态', width: 80,
                     templet: function (d) {
-                        return d.status === 1 ? 
-                            '<span class="layui-badge layui-bg-green">启用</span>' : 
+                        return d.status === 1 ?
+                            '<span class="layui-badge layui-bg-green">启用</span>' :
                             '<span class="layui-badge layui-bg-gray">禁用</span>';
                     }
                 },
@@ -137,7 +129,7 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
             defaultToolbar: ['filter', 'exports', 'print'],
             cols: [[
                 {type: 'checkbox'},
-                {field: 'id', title: 'ID', sort: true, width: 80},
+                {field: 'id', title: 'ID', sort: true, width: 200},
                 {field: 'platform', title: '平台', width: 100},
                 {field: 'market', title: '市场', width: 80},
                 {field: 'accountId', title: '账号', width: 200},
@@ -187,7 +179,7 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
 
     // 初始化策略表格
     initStrategyTable();
-    
+
     // 初始化账户表格
     initAccountTable();
 
@@ -204,7 +196,7 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                 success: function (layero, index) {
                     form.val('securityForm', data);
                     form.render();
-                    
+
                     // 监听表单提交事件
                     form.on('submit(securitySubmit)', function (data) {
                         $.ajax({
@@ -283,7 +275,7 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                 success: function (layero, index) {
                     // 先渲染表单
                     form.render();
-                    
+
                     // 加载标的列表
                     $.ajax({
                         url: '/admin/security/list',
@@ -297,28 +289,28 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                                 $.each(securityList, function (index, item) {
                                     securitySelect.append('<option value="' + item.code + '">' + item.code + ' - ' + item.name + '</option>');
                                 });
-                                
+
                                 // 设置表单值
                                 form.val('strategyForm', data);
-                                
+
                                 // 处理ext字段中的wheel_sellput_strike_price
                                 if (data.ext && typeof data.ext === 'object' && data.ext.wheel_sellput_strike_price) {
                                     $('input[name="sellPutStrikePrice"]').val(data.ext.wheel_sellput_strike_price);
                                 }
-                                
+
                                 // 处理ext字段中的initial_stock_num
                                 if (data.ext && typeof data.ext === 'object' && data.ext.initial_stock_num) {
                                     $('input[name="initialStockNum"]').val(data.ext.initial_stock_num);
                                 }
-                                
+
                                 // 处理ext字段中的initial_stock_cost
                                 if (data.ext && typeof data.ext === 'object' && data.ext.initial_stock_cost) {
                                     $('input[name="initialStockCost"]').val(data.ext.initial_stock_cost);
                                 }
-                                
+
                                 // 根据策略代码显示或隐藏特定配置
                                 toggleStrategyConfig(data.strategyCode);
-                                
+
                                 form.render('select');
                             } else {
                                 layer.msg('加载标的列表失败：' + res.message, {icon: 2});
@@ -333,20 +325,20 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                             form.val('strategyForm', data);
                         }
                     });
-                    
+
                     // 监听策略代码选择变化
                     form.on('select(strategyCode)', function(data){
                         toggleStrategyConfig(data.value);
                     });
-                    
+
                     // 根据策略代码显示或隐藏特定配置
                     function toggleStrategyConfig(strategyCode) {
                         if (strategyCode === 'wheel_strategy') {
                             $('#wheelStrategyConfig').show();
-                            
+
                             // 获取当前表单数据
                             var formData = form.val('strategyForm');
-                            
+
                             // 如果有ext数据，尝试从中提取wheel_sellput_strike_price和initial_stock_num
                             if (formData.ext) {
                                 var extData;
@@ -360,15 +352,15 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                                 } else {
                                     extData = formData.ext;
                                 }
-                                
+
                                 if (extData.wheel_sellput_strike_price) {
                                     $('input[name="sellPutStrikePrice"]').val(extData.wheel_sellput_strike_price);
                                 }
-                                
+
                                 if (extData.initial_stock_num) {
                                     $('input[name="initialStockNum"]').val(extData.initial_stock_num);
                                 }
-                                
+
                                 if (extData.initial_stock_cost) {
                                     $('input[name="initialStockCost"]').val(extData.initial_stock_cost);
                                 }
@@ -379,7 +371,7 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                             $('input[name="sellPutStrikePrice"]').val('');
                         }
                     }
-                    
+
                     // 监听表单提交事件
                     form.on('submit(strategySubmit)', function (data) {
                         // 处理ext字段
@@ -392,29 +384,29 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                                 data.field.ext = {};
                             }
                         }
-                        
+
                         // 处理车轮策略特有的配置
                         if (data.field.strategyCode === 'wheel_strategy' && data.field.sellPutStrikePrice) {
                             data.field.ext.wheel_sellput_strike_price = data.field.sellPutStrikePrice;
                         }
-                        
+
                         // 处理通用配置 - 初始股票数
                         if (data.field.initialStockNum) {
                             data.field.ext.initial_stock_num = data.field.initialStockNum;
                         }
-                        
+
                         // 处理通用配置 - 初始股票成本价
                         if (data.field.initialStockCost) {
                             data.field.ext.initial_stock_cost = data.field.initialStockCost;
                         }
-                        
+
                         // 删除临时字段
                         delete data.field.sellPutStrikePrice;
                         delete data.field.initialStockNum;
                         delete data.field.initialStockCost;
-                        
+
                         console.log('提交的数据:', JSON.stringify(data.field));
-                        
+
                         $.ajax({
                             url: '/admin/strategy/save',
                             type: 'POST',
@@ -491,7 +483,7 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
             content: $('#securityFormTpl').html(),
             success: function (layero, index) {
                 form.render();
-                
+
                 // 监听表单提交事件
                 form.on('submit(securitySubmit)', function (data) {
                     $.ajax({
@@ -525,7 +517,7 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
             success: function (layero, index) {
                 // 先渲染表单
                 form.render();
-                
+
                 // 加载标的列表
                 $.ajax({
                     url: '/admin/security/list',
@@ -540,15 +532,15 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                                 securitySelect.append('<option value="' + item.code + '">' + item.code + ' - ' + item.name + '</option>');
                             });
                             form.render('select');
-                            
+
                             // 默认隐藏车轮策略特有配置
                             $('#wheelStrategyConfig').hide();
-                            
+
                             // 监听策略代码选择变化
                             form.on('select(strategyCode)', function(data){
                                 toggleStrategyConfig(data.value);
                             });
-                            
+
                             // 根据策略代码显示或隐藏特定配置
                             function toggleStrategyConfig(strategyCode) {
                                 if (strategyCode === 'wheel_strategy') {
@@ -568,7 +560,7 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                         layer.msg('加载标的列表请求失败，请检查网络连接', {icon: 2});
                     }
                 });
-                
+
                 // 监听表单提交事件
                 form.on('submit(strategySubmit)', function (data) {
                     // 处理ext字段
@@ -581,29 +573,29 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                             data.field.ext = {};
                         }
                     }
-                    
+
                     // 处理车轮策略特有的配置
                     if (data.field.strategyCode === 'wheel_strategy' && data.field.sellPutStrikePrice) {
                         data.field.ext.wheel_sellput_strike_price = data.field.sellPutStrikePrice;
                     }
-                    
+
                     // 处理通用配置 - 初始股票数
                     if (data.field.initialStockNum) {
                         data.field.ext.initial_stock_num = data.field.initialStockNum;
                     }
-                    
+
                     // 处理通用配置 - 初始股票成本价
                     if (data.field.initialStockCost) {
                         data.field.ext.initial_stock_cost = data.field.initialStockCost;
                     }
-                    
+
                     // 删除临时字段
                     delete data.field.sellPutStrikePrice;
                     delete data.field.initialStockNum;
                     delete data.field.initialStockCost;
-                    
+
                     console.log('提交的数据:', JSON.stringify(data.field));
-                    
+
                     $.ajax({
                         url: '/admin/strategy/save',
                         type: 'POST',
@@ -711,6 +703,44 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
         });
     });
 
+    // 获取账户扩展字段元数据
+    function getAccountExtFields() {
+        return $.ajax({
+            url: '/field/ext/account',
+            type: 'GET',
+            async: false
+        }).responseJSON.data;
+    }
+
+    // 根据字段元数据动态渲染表单
+    function renderAccountExtFields(extFields, extData) {
+        let html = '';
+        // 渲染字段
+        extFields.forEach(field => {
+            const value = extData && extData[field.key] ? extData[field.key] : '';
+
+            if (field.type === 'text') {
+                html += `
+        <div class="layui-form-item">
+            <label class="layui-form-label">${field.desc}</label>
+            <div class="layui-input-block">
+                <input type="text" id="${field.key}" placeholder="请输入${field.desc}" autocomplete="off" class="layui-input" value="${value}">
+            </div>
+        </div>`;
+            } else if (field.type === 'textarea') {
+                html += `
+        <div class="layui-form-item">
+            <label class="layui-form-label">${field.desc}</label>
+            <div class="layui-input-block">
+                <textarea id="${field.key}" placeholder="请输入${field.desc}" class="layui-textarea" rows="4">${value}</textarea>
+            </div>
+        </div>`;
+            }
+        });
+
+        return html;
+    }
+
     // 账户表格工具条事件
     table.on('tool(accountTable)', function (obj) {
         const data = obj.data;
@@ -724,66 +754,39 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                 success: function (layero, index) {
                     // 设置表单值
                     form.val('accountForm', data);
-                    
+
+                    // 获取账户扩展字段元数据
+                    const extFields = getAccountExtFields();
+
                     // 处理ext字段
                     if (data.ext) {
-                        //设置资金规模
-                        $('#account_size').val(data.ext.account_size || '');
-                        $('#margin_ratio').val(data.ext.margin_ratio || '');
-                        $('#position_ratio').val(data.ext.position_ratio || '');
-
-                        // 设置长桥配置
-                        $('#longport_app_key').val(data.ext.longport_app_key || '');
-                        $('#longport_app_secret').val(data.ext.longport_app_secret || '');
-                        $('#longport_access_token').val(data.ext.longport_access_token || '');
-                        
-                        // 设置AI配置
-                        $('#ai_base_url').val(data.ext.ai_base_url || 'https://dashscope.aliyuncs.com/compatible-mode/v1');
-                        $('#ai_api_model').val(data.ext.ai_api_model || 'deepseek-r1');
-                        $('#ai_api_key').val(data.ext.ai_api_key || '');
-                        $('#ai_api_temperature').val(data.ext.ai_api_temperature || '0.3');
-                        $('#ai_mcp_settings').val(data.ext.ai_mcp_settings || '');
-                        
-                        // 设置分析配置
-                        $('#kline_period').val(data.ext.kline_period || 'WEEK');
+                        // 动态渲染扩展字段
+                        const extHtml = renderAccountExtFields(extFields, data.ext);
+                        $('#accountExtFields').html(extHtml);
                     }
-                    
+
                     // 渲染表单
                     form.render();
-                    
+
                     // 监听表单提交事件
                     form.on('submit(accountSubmit)', function (data) {
                         // 处理ext字段
                         const ext = {};
-                        
-                        // 处理资金规模
-                        ext.account_size = $('#account_size').val();
-                        ext.margin_ratio = $('#margin_ratio').val();
-                        ext.position_ratio = $('#position_ratio').val();    
-                        // 处理长桥配置
-                        ext.longport_app_key = $('#longport_app_key').val();
-                        ext.longport_app_secret = $('#longport_app_secret').val();
-                        ext.longport_access_token = $('#longport_access_token').val();
 
-                        // 处理AI配置
-                        ext.ai_base_url = $('#ai_base_url').val();
-                        ext.ai_api_model = $('#ai_api_model').val();
-                        ext.ai_api_key = $('#ai_api_key').val();
-                        ext.ai_api_temperature = $('#ai_api_temperature').val();
-                        ext.ai_mcp_settings = $('#ai_mcp_settings').val();
-                        
-                        // 处理分析配置
-                        ext.kline_period = $('#kline_period').val();
-                        
+                        // 根据字段元数据收集扩展字段值
+                        extFields.forEach(field => {
+                            const value = $('#' + field.key).val();
+                            if (value !== undefined && value !== null && value !== '') {
+                                ext[field.key] = value;
+                            }
+                        });
+
                         // 设置ext字段
                         data.field.ext = ext;
-                        
-                        // 删除表单中的kline_period字段，因为它已经被放入ext对象中
-                        delete data.field.kline_period;
-                        
+
                         // 确保ext字段是对象而不是字符串
                         const formData = {...data.field};
-                        
+
                         $.ajax({
                             url: '/admin/account/save',
                             type: 'POST',
@@ -829,7 +832,7 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
             });
         }
     });
-    
+
     // 添加账户按钮事件
     $('#addAccountBtn').click(function () {
         layer.open({
@@ -838,39 +841,35 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
             area: ['800px', '800px'],
             content: $('#accountFormTpl').html(),
             success: function (layero, index) {
+                // 获取账户扩展字段元数据
+                const extFields = getAccountExtFields();
+
+                // 动态渲染扩展字段
+                const extHtml = renderAccountExtFields(extFields, {});
+                $('#accountExtFields').html(extHtml);
+
                 // 渲染表单
                 form.render();
+
                 // 监听表单提交事件
                 form.on('submit(accountSubmit)', function (data) {
                     // 处理ext字段
                     const ext = {};
-                    
-                    // 处理长桥配置
-                    if (data.field.platform === 'longport') {
-                        ext.longport_app_key = $('#longport_app_key').val();
-                        ext.longport_app_secret = $('#longport_app_secret').val();
-                        ext.longport_access_token = $('#longport_access_token').val();
-                    }
-                    
-                    // 处理AI配置
-                    ext.ai_base_url = $('#ai_base_url').val();
-                    ext.ai_api_model = $('#ai_api_model').val();
-                    ext.ai_api_key = $('#ai_api_key').val();
-                    ext.ai_api_temperature = $('#ai_api_temperature').val();
-                    ext.ai_mcp_settings = $('#ai_mcp_settings').val();
-                    
-                    // 处理分析配置
-                    ext.kline_period = $('#kline_period').val();
-                    
+
+                    // 根据字段元数据收集扩展字段值
+                    extFields.forEach(field => {
+                        const value = $('#' + field.key).val();
+                        if (value !== undefined && value !== null && value !== '') {
+                            ext[field.key] = value;
+                        }
+                    });
+
                     // 设置ext字段
                     data.field.ext = ext;
-                    
-                    // 删除表单中的kline_period字段，因为它已经被放入ext对象中
-                    delete data.field.kline_period;
-                    
+
                     // 确保ext字段是对象而不是字符串
                     const formData = {...data.field};
-                    
+
                     $.ajax({
                         url: '/admin/account/save',
                         type: 'POST',
@@ -895,12 +894,12 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
             }
         });
     });
-    
+
     // 刷新账户表格按钮事件
     $('#refreshAccountBtn').click(function () {
         accountTable.reload();
     });
-    
+
     // 批量删除账户按钮事件
     $('#deleteAccountBtn').click(function () {
         const checkStatus = table.checkStatus('accountTable');
@@ -935,4 +934,201 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
             layer.close(index);
         });
     });
-}); 
+
+    // 知识库表格
+    const knowledgeTable = table.render({
+        elem: '#knowledgeTable',
+        url: '/admin/knowledge/list',
+        cols: [[
+            {type: 'checkbox', fixed: 'left'},
+            {field: 'id', title: 'ID', width: 200, sort: true},
+            {field: 'title', title: '标题', width: 200},
+            {field: 'type', title: '类型', width: 150, templet: function(d) {
+                if (d.type === 'OPTION_STRATEGY' || d.type === 1) {
+                    return '期权策略知识';
+                } else if (d.type === 'RULE' || d.type === 2) {
+                    return '规则知识';
+                }
+                return d.type;
+            }},
+            {field: 'description', title: '描述', width: 300},
+            {field: 'status', title: '状态', width: 100, templet: function(d) {
+                return d.status === 1 ? '<span style="color: green;">启用</span>' : '<span style="color: red;">禁用</span>';
+            }},
+            {field: 'createTime', title: '创建时间', width: 180},
+            {fixed: 'right', title: '操作', toolbar: '#knowledgeTableBar', width: 200}
+        ]],
+        page: true,
+        limit: 10,
+        limits: [10, 20, 50],
+        request: {
+            pageName: 'page',
+            limitName: 'size'
+        },
+        response: {
+            statusCode: 0
+        },
+        parseData: function(res) {
+            return {
+                "code": res.success ? 0 : 1,
+                "msg": res.message,
+                "count": res.data ? res.data.length : 0,
+                "data": res.data
+            };
+        }
+    });
+
+    // 知识库表格工具条事件
+    table.on('tool(knowledgeTable)', function (obj) {
+        const data = obj.data;
+        if (obj.event === 'edit') {
+            // 编辑
+            layer.open({
+                type: 1,
+                title: '编辑知识库',
+                area: ['800px', '600px'],
+                content: $('#knowledgeFormTpl').html(),
+                success: function (layero, index) {
+                    // 设置表单值
+                    form.val('knowledgeForm', data);
+                    form.render();
+
+                    // 监听表单提交事件
+                    form.on('submit(knowledgeSubmit)', function (formData) {
+                        $.ajax({
+                            url: '/admin/knowledge/save',
+                            type: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify(formData.field),
+                            success: function (res) {
+                                if (res.success) {
+                                    layer.close(index);
+                                    layer.msg('保存成功');
+                                    knowledgeTable.reload();
+                                } else {
+                                    layer.msg('保存失败：' + res.message);
+                                }
+                            }
+                        });
+                        return false;
+                    });
+                }
+            });
+        } else if (obj.event === 'delete') {
+            // 删除
+            layer.confirm('确定要删除该知识库吗？', function (index) {
+                $.ajax({
+                    url: '/admin/knowledge/status',
+                    type: 'POST',
+                    data: {
+                        id: data.id,
+                        status: 0
+                    },
+                    success: function (res) {
+                        if (res.success) {
+                            layer.msg('删除成功');
+                            knowledgeTable.reload();
+                        } else {
+                            layer.msg('删除失败：' + res.message);
+                        }
+                    }
+                });
+                layer.close(index);
+            });
+        } else if (obj.event === 'toggle') {
+            // 切换状态
+            const newStatus = data.status === 1 ? 0 : 1;
+            const statusText = newStatus === 1 ? '启用' : '禁用';
+            $.ajax({
+                url: '/admin/knowledge/status',
+                type: 'POST',
+                data: {
+                    id: data.id,
+                    status: newStatus
+                },
+                success: function (res) {
+                    if (res.success) {
+                        layer.msg(statusText + '成功');
+                        knowledgeTable.reload();
+                    } else {
+                        layer.msg(statusText + '失败：' + res.message);
+                    }
+                }
+            });
+        }
+    });
+
+    // 添加知识库按钮事件
+    $('#addKnowledgeBtn').click(function () {
+        layer.open({
+            type: 1,
+            title: '添加知识库',
+            area: ['800px', '600px'],
+            content: $('#knowledgeFormTpl').html(),
+            success: function (layero, index) {
+                form.render();
+
+                // 监听表单提交事件
+                form.on('submit(knowledgeSubmit)', function (data) {
+                    $.ajax({
+                        url: '/admin/knowledge/save',
+                        type: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify(data.field),
+                        success: function (res) {
+                            if (res.success) {
+                                layer.close(index);
+                                layer.msg('保存成功');
+                                knowledgeTable.reload();
+                            } else {
+                                layer.msg('保存失败：' + res.message);
+                            }
+                        }
+                    });
+                    return false;
+                });
+            }
+        });
+    });
+
+    // 刷新知识库表格按钮事件
+    $('#refreshKnowledgeBtn').click(function () {
+        knowledgeTable.reload();
+    });
+
+    // 批量删除知识库按钮事件
+    $('#deleteKnowledgeBtn').click(function () {
+        const checkStatus = table.checkStatus('knowledgeTable');
+        const data = checkStatus.data;
+        if (data.length === 0) {
+            layer.msg('请选择要删除的知识库');
+            return;
+        }
+        layer.confirm('确定要删除选中的' + data.length + '个知识库吗？', function (index) {
+            let count = 0;
+            let success = 0;
+            data.forEach(function (item) {
+                $.ajax({
+                    url: '/admin/knowledge/status',
+                    type: 'POST',
+                    async: false,
+                    data: {
+                        id: item.id,
+                        status: 0
+                    },
+                    success: function (res) {
+                        count++;
+                        if (res.success) {
+                            success++;
+                        }
+                        if (count === data.length) {
+                            layer.msg('成功删除' + success + '个知识库');
+                            knowledgeTable.reload();
+                        }
+                    }
+                });
+            });
+            layer.close(index);
+        });
+    });
+});

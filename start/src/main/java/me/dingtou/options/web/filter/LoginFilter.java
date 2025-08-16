@@ -23,7 +23,7 @@ import javax.crypto.SecretKey;
 
 import org.apache.commons.lang3.StringUtils;
 
-import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson2.JSON;
 
 @Slf4j
 public class LoginFilter implements Filter {
@@ -43,6 +43,14 @@ public class LoginFilter implements Filter {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
         HttpServletResponse httpResponse = (HttpServletResponse) response;
         httpResponse.setCharacterEncoding("UTF-8");
+
+        // 检查是否为排除的路径
+        String requestURI = httpRequest.getRequestURI();
+        if (requestURI.equals("/sse") || requestURI.equals("/mcp/message")) {
+            chain.doFilter(request, response);
+            return;
+        }
+
         String apiKey = httpRequest.getHeader("apiKey");
 
         // header auth

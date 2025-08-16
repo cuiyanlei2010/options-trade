@@ -1,12 +1,16 @@
 package me.dingtou.options.service.copilot.processer;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
+
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
-import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson2.JSON;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -29,6 +33,10 @@ import me.dingtou.options.util.TemplateRenderer;
 @Slf4j
 public class McpToolProcesser implements ToolProcesser {
 
+    private static final Pattern pattern = Pattern.compile(
+            "<use_mcp_tool>[\\s\\S]*?<server_name>(.*?)</server_name>[\\s\\S]*?<tool_name>(.*?)</tool_name>[\\s\\S]*?<arguments>(.*?)</arguments>[\\s\\S]*?</use_mcp_tool>",
+            Pattern.DOTALL);
+
     @Override
     public boolean support(String content) {
         if (StringUtils.isBlank(content)) {
@@ -38,30 +46,25 @@ public class McpToolProcesser implements ToolProcesser {
     }
 
     @Override
-    public ToolCallRequest parseToolRequest(String owner, String content) {
+    public List<ToolCallRequest> parseToolRequest(String owner, String content) {
         // 尝试解析use_mcp_tool
+        List<ToolCallRequest> toolCalls = new ArrayList<>();
         try {
             ToolCallRequest toolCall = null;
             // 提取整个XML结构中的参数
-            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
-                    "<use_mcp_tool>[\\s\\S]*?<server_name>(.*?)</server_name>[\\s\\S]*?<tool_name>(.*?)</tool_name>[\\s\\S]*?<arguments>(.*?)</arguments>[\\s\\S]*?</use_mcp_tool>",
-                    java.util.regex.Pattern.DOTALL);
             java.util.regex.Matcher matcher = pattern.matcher(content);
-            if (matcher.find()) {
+            while (matcher.find()) {
                 String serverName = matcher.group(1).trim();
                 String toolName = matcher.group(2).trim();
                 String argsContent = matcher.group(3).trim();
                 toolCall = new McpToolCallRequest(owner, serverName, toolName, argsContent);
                 log.info("Find Tool {} -> {}", serverName, toolName);
-                return toolCall;
+                toolCalls.add(toolCall);
             }
         } catch (Exception xmlException) {
             log.error("Failed to parse use_mcp_tool from XML: {}", xmlException.getMessage());
         }
-
-        // 默认返回null
-        log.error("Unrecognized tool call format: {}", content);
-        return null;
+        return toolCalls;
     }
 
     @SuppressWarnings({ "rawtypes", "unchecked" })
@@ -81,8 +84,13 @@ public class McpToolProcesser implements ToolProcesser {
 
             CallToolResult result = client.callTool(new CallToolRequest(mcpToolCallRequest.getToolName(), params));
             TextContent content = (TextContent) result.content().get(0);
-
             String jsonText = content.text();
+
+            log.info("callTool {}.{} -> result: {}",
+                    mcpToolCallRequest.getServerName(),
+                    mcpToolCallRequest.getTool(),
+                    jsonText);
+
             ObjectMapper mapper = new ObjectMapper();
             JsonNode node = mapper.readTree(jsonText);
             if (node.isNumber()) {

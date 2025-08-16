@@ -1,7 +1,10 @@
 package me.dingtou.options.manager;
 
+import me.dingtou.options.constant.CandlestickPeriod;
 import me.dingtou.options.gateway.OptionsChainGateway;
 import me.dingtou.options.model.*;
+import me.dingtou.options.util.AccountExtUtils;
+
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -11,7 +14,7 @@ import java.util.Collections;
 import java.util.List;
 
 @Component
-public class OptionsManager {
+public class OptionsQueryManager {
 
     @Autowired
     private OptionsChainGateway optionsChainGateway;
@@ -68,7 +71,8 @@ public class OptionsManager {
 
         if (includeIndicator) {
             // 策略分析提供基础指标数据
-            stockIndicator = indicatorManager.calculateStockIndicator(ownerAccount, security);
+            CandlestickPeriod klinePeriod = AccountExtUtils.getKlinePeriod(ownerAccount);
+            stockIndicator = indicatorManager.calculateStockIndicator(ownerAccount, security, klinePeriod, 30);
             vixIndicator = indicatorManager.queryCurrentVix();
 
             lastDone = stockIndicator.getSecurityQuote().getLastDone();

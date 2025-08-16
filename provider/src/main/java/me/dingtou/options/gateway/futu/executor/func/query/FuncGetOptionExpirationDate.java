@@ -1,6 +1,6 @@
 package me.dingtou.options.gateway.futu.executor.func.query;
 
-import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson2.JSON;
 import com.futu.openapi.pb.QotCommon;
 import com.futu.openapi.pb.QotGetOptionExpirationDate;
 import com.google.protobuf.GeneratedMessageV3;
@@ -39,7 +39,7 @@ public class FuncGetOptionExpirationDate implements QueryFunctionCall<List<Optio
                 .build();
         QotGetOptionExpirationDate.Request req = QotGetOptionExpirationDate.Request.newBuilder().setC2S(c2s).build();
         int seqNo = client.getOptionExpirationDate(req);
-        log.warn("Send QotGetOptionExpirationDate: {}", seqNo);
+        log.debug("Send QotGetOptionExpirationDate: {}", seqNo);
         if (seqNo == 0) {
             throw new RuntimeException("QotGetOptionExpirationDate error");
         }

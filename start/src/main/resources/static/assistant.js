@@ -118,13 +118,13 @@ layui.use(['layer', 'form', 'util'], function() {
          */
         initChatModeFromUrl() {
             const urlParams = new URLSearchParams(window.location.search);
-            const mode = urlParams.get('mode') || 'agent'; // 默认agent模式
+            const mode = urlParams.get('mode') || 'agent_v2'; // 默认agent模式
             const modeSelect = document.getElementById('chat-mode');
             
-            if (['ask', 'agent'].includes(mode.toLowerCase())) {
+            if (['ask', 'agent_v2'].includes(mode.toLowerCase())) {
                 modeSelect.value = mode.toLowerCase();
             } else {
-                modeSelect.value = 'agent'; // 无效值默认agent模式
+                modeSelect.value = 'agent_v2'; // 无效值默认agent模式
             }
             
             // 重新渲染layui的select组件，确保显示更新
@@ -452,7 +452,7 @@ layui.use(['layer', 'form', 'util'], function() {
             // 显示聊天记录
             records.forEach(record => {
                 const message = {
-                    id: record.messageId || new Date().getTime(),
+                    messageId: record.messageId || new Date().getTime(),
                     role: record.role,
                     content: record.content,
                     reasoningContent: record.reasoningContent,
@@ -492,7 +492,7 @@ layui.use(['layer', 'form', 'util'], function() {
          */
         appendMessage(message) {
             const historyDiv = this.elements.chatHistory;
-            const messageId = message.id?message.id:new Date().getTime();
+            const messageId = message.messageId?message.messageId:new Date().getTime();
             const reasoningId = `${message.role}-reasoning-${messageId}`;
             const contentId = `${message.role}-content-${messageId}`;
 
@@ -652,7 +652,7 @@ layui.use(['layer', 'form', 'util'], function() {
             
             // 添加用户消息到聊天界面
             const userMessage = {
-                id: new Date().getTime(),
+                messageId: new Date().getTime(),
                 role: 'user',
                 content: message,
                 time: new Date()
@@ -668,7 +668,7 @@ layui.use(['layer', 'form', 'util'], function() {
             // 构建请求参数
             const params = new URLSearchParams({
                 requestId: this.currentClientId,
-                title: title || '未命名会话',
+                title: title || '',
                 message: message,
                 mode: mode  // 添加模式参数
             });
