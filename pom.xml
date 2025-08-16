@@ -145,13 +145,13 @@
                 <version>${okhttp.version}</version>
             </dependency>
 
-            <dependency> 
-                <groupId>org.jobrunr</groupId> 
-                <artifactId>jobrunr</artifactId> 
+            <dependency>
+                <groupId>org.jobrunr</groupId>
+                <artifactId>jobrunr</artifactId>
                 <version>${jobrunr.version}</version>
             </dependency>
-            <dependency> 
-                <groupId>org.jobrunr</groupId> 
+            <dependency>
+                <groupId>org.jobrunr</groupId>
                 <artifactId>jobrunr-spring-boot-3-starter</artifactId>
                 <version>${jobrunr.version}</version>
             </dependency>
