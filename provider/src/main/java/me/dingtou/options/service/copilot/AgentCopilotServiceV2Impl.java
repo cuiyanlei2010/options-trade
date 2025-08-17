@@ -3,7 +3,6 @@ package me.dingtou.options.service.copilot;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,13 +18,11 @@ import com.alibaba.fastjson2.JSON;
 
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.PartialThinking;
 import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
-import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.spec.McpSchema.ListToolsResult;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
@@ -42,11 +39,12 @@ import me.dingtou.options.service.AuthService;
 import me.dingtou.options.util.AccountExtUtils;
 import me.dingtou.options.util.DateUtils;
 import me.dingtou.options.util.EscapeUtils;
+import me.dingtou.options.util.LlmUtils;
 import me.dingtou.options.util.McpUtils;
 import me.dingtou.options.util.TemplateRenderer;
 
 /**
- * Agent模式，langchain4j不支持思考内容输出
+ * Agent模式
  */
 @Slf4j
 @Component
@@ -94,10 +92,10 @@ public class AgentCopilotServiceV2Impl implements CopilotService {
         initMcpServer(account);
 
         // 构建包含MCP工具描述的系统提示词
-        String firstMessage = buildSystemPrompt(owner, ownerCode, message.getContent());
+        String firstMessage = buildSystemPrompt(account, ownerCode, message.getContent());
         Message agentMessage = new Message("user", firstMessage);
 
-        agentWork(account, title, agentMessage, callback, failCallback, sessionId, new ArrayList<>());
+        work(account, title, agentMessage, callback, failCallback, sessionId, new ArrayList<>());
 
         return sessionId;
     }
@@ -141,7 +139,7 @@ public class AgentCopilotServiceV2Impl implements CopilotService {
         // 添加新消息
         Message newMessage = new Message("user", continueMessage);
 
-        agentWork(account, title, newMessage, callback, failCallback, sessionId, messages);
+        work(account, title, newMessage, callback, failCallback, sessionId, messages);
     }
 
     /**
@@ -172,7 +170,7 @@ public class AgentCopilotServiceV2Impl implements CopilotService {
      * @param sessionId       会话ID
      * @param historyMessages 历史消息列表
      */
-    private void agentWork(OwnerAccount account,
+    private void work(OwnerAccount account,
             String title,
             Message newMessage,
             Function<Message, Void> callback,
@@ -184,23 +182,22 @@ public class AgentCopilotServiceV2Impl implements CopilotService {
         int maxIterations = 10;
         int iteration = 0;
 
-        List<ChatMessage> chatMessages = convertMessage(historyMessages);
+        List<ChatMessage> chatMessages = LlmUtils.convertMessage(historyMessages);
 
         String owner = account.getOwner();
         // 保存用户消息
         saveChatRecord(owner, sessionId, title, newMessage);
-        chatMessages.add(convertMessage(newMessage));
+        chatMessages.add(LlmUtils.convertMessage(newMessage));
 
-        StreamingChatModel chatModel = buildChatModel(account, false);
-        StreamingChatModel summaryModel = buildChatModel(account, true);
+        StreamingChatModel chatModel = LlmUtils.buildChatModel(account, false);
+        StreamingChatModel summaryModel = LlmUtils.buildChatModel(account, true);
         final StringBuffer finalResponse = new StringBuffer();
-        final CountDownLatch[] latch = new CountDownLatch[1];
         // 是否需要切换summary模型
         final AtomicBoolean needSummary = new AtomicBoolean(false);
         while (iteration++ < maxIterations && finalResponse.isEmpty()) {
             final StringBuffer returnMessage = new StringBuffer();
             String messageId = "assistant" + System.currentTimeMillis();
-            latch[0] = new CountDownLatch(1);
+            final CountDownLatch latch = new CountDownLatch(1);
             // 切换模型
             StreamingChatModel model = needSummary.get() && null != summaryModel ? summaryModel : chatModel;
             model.chat(chatMessages, new StreamingChatResponseHandler() {
@@ -233,14 +230,14 @@ public class AgentCopilotServiceV2Impl implements CopilotService {
                     if (null == toolProcesser) {
                         // 没有工具调用，返回最终结果
                         finalResponse.append(finalMsg);
-                        latch[0].countDown();
+                        latch.countDown();
                         return;
                     }
                     List<ToolCallRequest> toolCalls = toolProcesser.parseToolRequest(owner, finalMsg);
                     if (toolCalls == null || toolCalls.isEmpty()) {
                         // 没有工具调用，也返回最终结果
                         finalResponse.append(finalMsg);
-                        latch[0].countDown();
+                        latch.countDown();
                         return;
                     }
 
@@ -266,20 +263,20 @@ public class AgentCopilotServiceV2Impl implements CopilotService {
                     // 添加工具响应消息
                     callback.apply(toolResultMessage);
                     // 将MCP结果提交给大模型继续处理
-                    latch[0].countDown();
+                    latch.countDown();
                     return;
                 }
 
                 @Override
                 public void onError(Throwable error) {
                     failCallback.apply(new Message("assistant", "模型请求失败:" + error.getMessage()));
-                    latch[0].countDown();
+                    latch.countDown();
                 }
             });
             // 使用过一次summary后切换成false
             needSummary.set(false);
             try {
-                latch[0].await();
+                latch.await();
             } catch (InterruptedException e) {
                 log.error("[Agent] 模型请求中断, sessionId={}", sessionId);
             }
@@ -312,67 +309,6 @@ public class AgentCopilotServiceV2Impl implements CopilotService {
     }
 
     /**
-     * 转换Message列表为ChatMessage列表
-     * 
-     * @param historyMessages 历史消息列表
-     * @return ChatMessage列表
-     */
-    private List<ChatMessage> convertMessage(List<Message> historyMessages) {
-        List<ChatMessage> chatMessages = new ArrayList<>();
-        if (historyMessages != null) {
-            for (Message message : historyMessages) {
-                chatMessages.add(convertMessage(message));
-            }
-        }
-        return chatMessages;
-    }
-
-    /**
-     * 转换Message为ChatMessage
-     * 
-     * @param message 消息
-     * @return ChatMessage
-     */
-    private ChatMessage convertMessage(Message message) {
-        ChatMessage chatMessage = null;
-        if ("user".equals(message.getRole())) {
-            chatMessage = new UserMessage(message.getContent());
-        } else if ("assistant".equals(message.getRole())) {
-            chatMessage = new AiMessage(message.getContent());
-        } else if ("system".equals(message.getRole())) {
-            chatMessage = new SystemMessage(message.getContent());
-        }
-        return chatMessage;
-    }
-
-    /**
-     * 构建流式ChatModel
-     * 
-     * @param account   账户信息
-     * @param isSummary 是否是总结模型
-     * @return 大模型对象
-     */
-    private StreamingChatModel buildChatModel(OwnerAccount account, boolean isSummary) {
-        String baseUrl = isSummary ? AccountExtUtils.getSummaryBaseUrl(account) : AccountExtUtils.getAiBaseUrl(account);
-        String model = isSummary ? AccountExtUtils.getSummaryApiModel(account) : AccountExtUtils.getAiApiModel(account);
-        String apiKey = isSummary ? AccountExtUtils.getSummaryApiKey(account) : AccountExtUtils.getAiApiKey(account);
-        String temperatureVal = isSummary ? AccountExtUtils.getSummaryApiTemperature(account)
-                : AccountExtUtils.getAiApiTemperature(account);
-        Double temperature = Double.parseDouble(temperatureVal);
-
-        return OpenAiStreamingChatModel.builder()
-                .baseUrl(baseUrl)
-                .apiKey(apiKey)
-                .modelName(model)
-                .customHeaders(Map.of("Content-Type", "application/json;charset=UTF-8"))
-                .temperature(temperature)
-                .returnThinking(true)
-                .logRequests(true)
-                .logResponses(true)
-                .build();
-    }
-
-    /**
      * 初始化MCP服务
      * 
      * @param ownerAccount 账户信息
@@ -386,8 +322,6 @@ public class AgentCopilotServiceV2Impl implements CopilotService {
         }
         // 默认配置初始化
         Map<String, Object> params = new HashMap<>();
-        Date expireDate = new Date(System.currentTimeMillis() + 365 * 24 * 60 * 60 * 1000L);
-        params.put("jwt", authService.jwt(ownerAccount.getOwner(), expireDate));
         mcpSettings = TemplateRenderer.render("config_default_mcp_settings.ftl", params);
         McpUtils.initMcpClient(ownerAccount.getOwner(), mcpSettings);
     }
@@ -395,17 +329,18 @@ public class AgentCopilotServiceV2Impl implements CopilotService {
     /**
      * 构建系统Prompt
      * 
-     * @param owner     账户
+     * @param account   账户
      * @param ownerCode 账户编码
      * @param content   内容
      * @return 系统Prompt
      */
-    private String buildSystemPrompt(String owner, String ownerCode, String content) {
+    private String buildSystemPrompt(OwnerAccount account, String ownerCode, String content) {
         Map<String, Object> data = new HashMap<>();
         data.put("task", content);
         data.put("ownerCode", ownerCode);
         data.put("time", DateUtils.currentTime());
 
+        String owner = account.getOwner();
         // 获取所有MCP服务
         Map<String, McpSyncClient> ownerMcpClient = McpUtils.getOwnerMcpClient(owner);
         if (null != ownerMcpClient) {
@@ -431,20 +366,22 @@ public class AgentCopilotServiceV2Impl implements CopilotService {
             data.put("servers", servers);
         }
 
+        // 是否使用系统策略
+        data.put("useSystemStrategies", AccountExtUtils.getUseSystemStrategies(account));
+
         List<OwnerKnowledge> knowledges = knowledgeManager.listKnowledges(owner);
         if (null != knowledges && !knowledges.isEmpty()) {
             knowledges.forEach(e -> {
                 e.setContent(EscapeUtils.escapeXml(e.getContent()));
             });
             // 扩展策略
-            List<OwnerKnowledge> strategys = knowledges.stream()
+            List<OwnerKnowledge> strategies = knowledges.stream()
                     .filter(e -> OwnerKnowledge.KnowledgeStatus.ENABLED.getCode().equals(e.getStatus()))
                     .filter(e -> OwnerKnowledge.KnowledgeType.OPTIONS_STRATEGY.getCode().equals(e.getType()))
                     .toList();
-            if (null != strategys && !strategys.isEmpty()) {
-                data.put("strategys", strategys);
+            if (null != strategies && !strategies.isEmpty()) {
+                data.put("strategies", strategies);
             }
-
             // 用户自定义规则
             List<OwnerKnowledge> rules = knowledges.stream()
                     .filter(e -> OwnerKnowledge.KnowledgeStatus.ENABLED.getCode().equals(e.getStatus()))
