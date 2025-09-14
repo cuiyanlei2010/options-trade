@@ -1,6 +1,7 @@
 package me.dingtou.options.gateway.futu;
 
 import lombok.extern.slf4j.Slf4j;
+import me.dingtou.options.constant.OptionsFilterType;
 import me.dingtou.options.gateway.OptionsChainGateway;
 import me.dingtou.options.gateway.futu.executor.QueryExecutor;
 import me.dingtou.options.gateway.futu.executor.func.query.FuncGetOptionsRealtimeData;
@@ -31,13 +32,6 @@ public class OptionsChainGatewayImpl implements OptionsChainGateway {
             .expireAfterWrite(1, TimeUnit.HOURS)
             .build();
 
-    /**
-     * 期权缓存
-     */
-    private static final Cache<String, List<Options>> OPTIONS_LIST_CACHE = CacheBuilder.newBuilder()
-            .maximumSize(1000)
-            .expireAfterWrite(10, TimeUnit.MINUTES)
-            .build();
 
     /**
      * 期权链的长度
@@ -74,24 +68,8 @@ public class OptionsChainGatewayImpl implements OptionsChainGateway {
     }
 
     @Override
-    public List<Options> queryAllOptions(Security security, String strikeTime) {
-        String key = security.toString() + "_" + strikeTime;
-        try {
-            return OPTIONS_LIST_CACHE.get(key, new Callable<List<Options>>() {
-                @Override
-                public List<Options> call() throws Exception {
-                    return QueryExecutor
-                            .query(new FuncGetOptionChain(security.getMarket(), security.getCode(), strikeTime, true));
-                }
-            });
-        } catch (ExecutionException e) {
-            log.error("get all options failed, security: {}", security, e);
-            throw new RuntimeException("get all options failed", e);
-        }
-    }
-
-    @Override
-    public OptionsChain queryOptionsChain(Security security, String strikeTime, BigDecimal lastDone) {
+    public OptionsChain queryOptionsChain(Security security, String strikeTime, BigDecimal lastDone,
+            OptionsFilterType filterType) {
         BigDecimal minStrikePrice = BigDecimal.ZERO;
         BigDecimal maxStrikePrice = BigDecimal.valueOf(Long.MAX_VALUE);
         if (null != lastDone && !BigDecimal.ZERO.equals(lastDone)) {
@@ -100,9 +78,9 @@ public class OptionsChainGatewayImpl implements OptionsChainGateway {
         }
 
         List<Options> optionsList = QueryExecutor
-                .query(new FuncGetOptionChain(security.getMarket(), security.getCode(), strikeTime));
+                .query(new FuncGetOptionChain(security.getMarket(), security.getCode(), strikeTime, filterType));
         if (null == optionsList || optionsList.isEmpty()) {
-            throw new RuntimeException("FuncGetOptionChain result null");
+            throw new RuntimeException(String.format("未查询到 %s %s 的期权链", security.getCode(), strikeTime));
         }
 
         OptionsChain optionsChain = new OptionsChain(security, strikeTime);

@@ -3,10 +3,6 @@ package me.dingtou.options.service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.SimpleDateFormat;
-import java.time.LocalDate;
-import java.time.DayOfWeek;
-import java.time.temporal.TemporalAdjusters;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
@@ -17,19 +13,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import me.dingtou.options.constant.AccountExt;
-import me.dingtou.options.constant.CandlestickPeriod;
 import me.dingtou.options.constant.OrderExt;
 import me.dingtou.options.constant.OrderStatus;
 import me.dingtou.options.constant.TradeSide;
 import me.dingtou.options.gateway.SecurityQuoteGateway;
-import me.dingtou.options.manager.IndicatorManager;
+import me.dingtou.options.manager.KnowledgeManager;
 import me.dingtou.options.manager.OptionsQueryManager;
 import me.dingtou.options.manager.OwnerManager;
 import me.dingtou.options.manager.TradeManager;
-import me.dingtou.options.model.Options;
 import me.dingtou.options.model.OptionsRealtimeData;
-import me.dingtou.options.model.OptionsStrikeDate;
 import me.dingtou.options.model.OwnerAccount;
+import me.dingtou.options.model.OwnerKnowledge;
 import me.dingtou.options.model.OwnerOrder;
 import me.dingtou.options.model.OwnerOrderGroup;
 import me.dingtou.options.model.OwnerPosition;
@@ -37,7 +31,6 @@ import me.dingtou.options.model.OwnerStrategy;
 import me.dingtou.options.model.OwnerSummary;
 import me.dingtou.options.model.Security;
 import me.dingtou.options.model.SecurityQuote;
-import me.dingtou.options.model.StockIndicator;
 import me.dingtou.options.model.StrategyExt;
 import me.dingtou.options.model.StrategySummary;
 import me.dingtou.options.strategy.OrderTradeStrategy;
@@ -61,7 +54,7 @@ public class SummaryServiceImpl implements SummaryService {
     private OptionsQueryManager optionsQueryManager;
 
     @Autowired
-    private IndicatorManager indicatorManager;
+    private KnowledgeManager knowledgeManager;
 
     @Autowired
     private SecurityQuoteGateway securityQuoteGateway;
@@ -79,6 +72,7 @@ public class SummaryServiceImpl implements SummaryService {
         BigDecimal allHoldStockProfit = BigDecimal.ZERO;
         BigDecimal allOpenOptionsQuantity = BigDecimal.ZERO;
         BigDecimal allIncome = BigDecimal.ZERO;
+        BigDecimal allTotalStockCost = BigDecimal.ZERO;
 
         List<OwnerStrategy> ownerStrategies = ownerManager.queryOwnerStrategy(owner);
         List<StrategySummary> strategySummaries = new CopyOnWriteArrayList<>();
@@ -107,14 +101,17 @@ public class SummaryServiceImpl implements SummaryService {
                     .forEach(order -> {
                         order.setExtValue(OrderExt.STRATEGY_ID, strategySummary.getStrategy().getStrategyId());
                         order.setExtValue(OrderExt.STRATEGY_NAME, strategySummary.getStrategy().getStrategyName());
+                        order.setExtValue(OrderExt.STRATEGY_AVG_DELTA, strategySummary.getAvgDelta());
+                        order.setExtValue(OrderExt.STRATEGY_PROMPT, strategySummary.getStrategyPrompt());
                         unrealizedOrders.add(order);
                     });
 
             allHoldStockProfit = allHoldStockProfit.add(strategySummary.getHoldStockProfit());
             allIncome = allIncome.add(strategySummary.getAllIncome());
+            allTotalStockCost = allTotalStockCost.add(strategySummary.getTotalStockCost());
             allOpenOptionsQuantity = allOpenOptionsQuantity.add(strategySummary.getOpenOptionsQuantity());
         }
-
+        ownerSummary.setAllTotalStockCost(allTotalStockCost);
         ownerSummary.setAllOptionsIncome(allOptionsIncome);
         ownerSummary.setTotalFee(totalFee);
         ownerSummary.setUnrealizedOptionsIncome(unrealizedOptionsIncome);
@@ -172,29 +169,29 @@ public class SummaryServiceImpl implements SummaryService {
                 OwnerStrategy strategy = strategySummary.getStrategy();
                 int initialStockNum = Integer.parseInt(strategy.getExtValue(StrategyExt.INITIAL_STOCK_NUM, "0"));
                 BigDecimal averageStockCost = strategySummary.getAverageStockCost();
-                BigDecimal totalStockCost = averageStockCost.multiply(new BigDecimal(initialStockNum));
-                initStockAccountSize = initStockAccountSize.add(totalStockCost);
+                BigDecimal holdStockCost = averageStockCost.multiply(new BigDecimal(initialStockNum));
+                initStockAccountSize = initStockAccountSize.add(holdStockCost);
             }
             accountSize = accountSize.add(initStockAccountSize);
             ownerSummary.setAccountSize(accountSize);
 
             // 计算PUT订单保证金占用和持有股票总成本
             BigDecimal putMarginOccupied = BigDecimal.ZERO;
-            BigDecimal totalStockCost = BigDecimal.ZERO;
+            BigDecimal holdStockCost = BigDecimal.ZERO;
             for (StrategySummary strategySummary : strategySummaries) {
                 putMarginOccupied = putMarginOccupied.add(strategySummary.getPutMarginOccupied());
-                totalStockCost = totalStockCost.add(strategySummary.getTotalStockCost());
+                holdStockCost = holdStockCost.add(strategySummary.getTotalStockCost());
             }
             ownerSummary.setPutMarginOccupied(putMarginOccupied);
             // 计算持有股票总成本(初始股票扣除)
-            ownerSummary.setTotalStockCost(totalStockCost.add(initStockAccountSize));
+            ownerSummary.setHoldStockCost(holdStockCost.add(initStockAccountSize));
 
             // 计算可用资金
             BigDecimal availableFunds = accountSize.subtract(putMarginOccupied)
-                    .subtract(totalStockCost)
+                    .subtract(holdStockCost)
                     .subtract(initStockAccountSize);
             ownerSummary.setAvailableFunds(availableFunds);
-            ownerSummary.setTotalInvestment(putMarginOccupied.add(totalStockCost));
+            ownerSummary.setTotalInvestment(putMarginOccupied.add(holdStockCost));
 
             // 计算未平仓订单的头寸占比
             for (OwnerOrder order : ownerSummary.getUnrealizedOrders()) {
@@ -229,95 +226,6 @@ public class SummaryServiceImpl implements SummaryService {
     }
 
     /**
-     * 获取下一个期权到期日
-     * 
-     * @param optionsStrikeDates 期权到期日列表
-     * @param order              订单
-     * @return 下一个期权到期日
-     */
-    private LocalDate getNextWeekOptionsStrikeDate(List<OptionsStrikeDate> optionsStrikeDates, OwnerOrder order) {
-        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
-        String strikeDateStr = dateFormat.format(order.getStrikeTime());
-        final LocalDate strikeDate = LocalDate.parse(strikeDateStr);
-        return optionsStrikeDates.stream()
-                .map(dateObj -> {
-                    String strikeTime = dateObj.getStrikeTime();
-                    LocalDate orderStrikeDate = LocalDate.parse(strikeTime);
-                    return orderStrikeDate;
-                })
-                .filter(date -> date.isAfter(strikeDate))
-                .findFirst()
-                .orElse(null);
-    }
-
-    /**
-     * 获取下一个月度期权到期日
-     * 
-     * @param optionsStrikeDates 期权到期日列表
-     * @param order              订单
-     * @return 下一个月度期权到期日
-     */
-    private LocalDate getNextMonthOptionsStrikeDate(List<OptionsStrikeDate> optionsStrikeDates, OwnerOrder order) {
-        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
-        String strikeDateStr = dateFormat.format(order.getStrikeTime());
-        final LocalDate strikeDate = LocalDate.parse(strikeDateStr);
-        return optionsStrikeDates.stream()
-                .map(dateObj -> LocalDate.parse(dateObj.getStrikeTime()))
-                .filter(date -> date.isAfter(strikeDate))
-                .filter(this::isThirdFriday)
-                .min(LocalDate::compareTo)
-                .orElse(null);
-    }
-
-    /**
-     * 判断日期是否为当月的第三个周五
-     * 
-     * @param date 待检查的日期
-     * @return 如果是第三个周五返回true，否则返回false
-     */
-    private boolean isThirdFriday(LocalDate date) {
-        if (date.getDayOfWeek() != DayOfWeek.FRIDAY) {
-            return false;
-        }
-        LocalDate firstDayOfMonth = date.withDayOfMonth(1);
-        LocalDate firstFriday = firstDayOfMonth.with(TemporalAdjusters.nextOrSame(DayOfWeek.FRIDAY));
-        LocalDate thirdFriday = firstFriday.plusWeeks(2);
-        return date.equals(thirdFriday);
-    }
-
-    /**
-     * 获取可以Roll的期权
-     * 
-     * @param order          订单
-     * @param nextStrikeDate 下一个期权到期日
-     * @return 可以Roll的期权
-     */
-    private List<Security> getRollOptionsSecurity(OwnerOrder order, LocalDate nextStrikeDate) {
-        List<Security> optionsSecurityList = new ArrayList<>();
-
-        BigDecimal strikePrice = OwnerOrder.strikePrice(order);
-        // 查询下一个期权到期日
-        int range = 5;
-        BigDecimal startPrice = strikePrice.subtract(BigDecimal.valueOf(range));
-        for (int i = 0; i <= range * 2; i++) {
-            BigDecimal nextStrikePrice = startPrice
-                    .add(BigDecimal.valueOf(i))
-                    .multiply(BigDecimal.valueOf(1000))
-                    .setScale(0);
-            // BABA250404P133000
-            String date = nextStrikeDate.format(DateTimeFormatter.ofPattern("yyMMdd"));
-            String code = order.getUnderlyingCode()
-                    + date
-                    + (OwnerOrder.isPut(order) ? "P" : "C")
-                    + nextStrikePrice.toPlainString();
-            optionsSecurityList.add(Security.of(code, order.getMarket()));
-        }
-
-        // OptionsManager
-        return optionsSecurityList;
-    }
-
-    /**
      * 查询策略汇总
      * 
      * @param owner         所有者
@@ -328,6 +236,10 @@ public class SummaryServiceImpl implements SummaryService {
         StrategySummary summary = new StrategySummary();
 
         summary.setStrategy(ownerStrategy);
+
+        OwnerKnowledge optionsStrategy = knowledgeManager.getKnowledgeByOwnerAndCode(owner,
+                ownerStrategy.getStrategyCode());
+        summary.setOptionsStrategy(optionsStrategy);
 
         // 订单列表
         List<OwnerOrder> ownerOrders = ownerManager.queryStrategyOrder(ownerStrategy);
@@ -371,23 +283,21 @@ public class SummaryServiceImpl implements SummaryService {
 
         // 股票订单
         int orderHoldStockNum = 0;
-        BigDecimal totalStockCost = BigDecimal.ZERO;
+        BigDecimal totalStockTradeCost = BigDecimal.ZERO;
         List<OwnerOrder> securityOrders = ownerOrders.stream()
                 .filter(OwnerOrder::isStockOrder)
                 .toList();
         for (OwnerOrder securityOrder : securityOrders) {
+            totalStockTradeCost = totalStockTradeCost.subtract(OwnerOrder.income(securityOrder));
             TradeSide tradeSide = TradeSide.of(securityOrder.getSide());
-            BigDecimal totalPrice = securityOrder.getPrice().multiply(new BigDecimal(securityOrder.getQuantity()));
             switch (tradeSide) {
                 case BUY:
                 case BUY_BACK:
                     orderHoldStockNum += securityOrder.getQuantity();
-                    totalStockCost = totalStockCost.add(totalPrice);
                     break;
                 case SELL:
                 case SELL_SHORT:
                     orderHoldStockNum -= securityOrder.getQuantity();
-                    totalStockCost = totalStockCost.subtract(totalPrice);
                     break;
                 default:
                     break;
@@ -399,15 +309,12 @@ public class SummaryServiceImpl implements SummaryService {
         int initialStockNum = Integer.parseInt(ownerStrategy.getExtValue(StrategyExt.INITIAL_STOCK_NUM, "0"));
         BigDecimal initialStockCost = new BigDecimal(ownerStrategy.getExtValue(StrategyExt.INITIAL_STOCK_COST, "0"));
 
-        // 股票成本
-        summary.setTotalStockCost(totalStockCost);
-
         BigDecimal averageStockCost = BigDecimal.ZERO;
         // 股票平均成本 = 系统设置 or 股票持有数量 / 股票数量
         if (orderHoldStockNum == 0) {
             averageStockCost = initialStockCost;
         } else {
-            averageStockCost = totalStockCost.divide(new BigDecimal(orderHoldStockNum), 4, RoundingMode.HALF_UP);
+            averageStockCost = totalStockTradeCost.divide(new BigDecimal(orderHoldStockNum), 4, RoundingMode.HALF_UP);
         }
 
         // 如果平均成本为0，则使用当前价格
@@ -416,8 +323,9 @@ public class SummaryServiceImpl implements SummaryService {
         }
 
         // 如果交易产生了成本或收益 则往平均成本上累计
-        if (initialStockNum != 0 && !BigDecimal.ZERO.equals(totalStockCost)) {
-            BigDecimal avgCost = totalStockCost.divide(BigDecimal.valueOf(initialStockNum), 4, RoundingMode.HALF_UP);
+        if (initialStockNum != 0 && !BigDecimal.ZERO.equals(totalStockTradeCost)) {
+            BigDecimal avgCost = totalStockTradeCost.divide(BigDecimal.valueOf(initialStockNum), 4,
+                    RoundingMode.HALF_UP);
             averageStockCost = averageStockCost.add(avgCost);
         }
 
@@ -426,6 +334,16 @@ public class SummaryServiceImpl implements SummaryService {
         // 总股票持有数量
         int holdStockNum = initialStockNum + orderHoldStockNum;
         summary.setHoldStockNum(holdStockNum);
+
+        // 股票成本（只有存在初始股本的策略，股票卖出，股票成本才能可能是负值）
+        BigDecimal totalStockCost = totalStockTradeCost;
+        if (BigDecimal.ZERO.compareTo(totalStockTradeCost) > 0
+                && initialStockNum != 0
+                && !BigDecimal.ZERO.equals(initialStockCost)) {
+            BigDecimal sellNum = BigDecimal.valueOf(initialStockNum - holdStockNum);
+            totalStockCost = totalStockTradeCost.add(initialStockCost.multiply(sellNum));
+        }
+        summary.setTotalStockCost(totalStockCost);
 
         int holdStockNumForProfit = holdStockNum;
         // 当初始股票被卖后 holdStockNum 会小于 initialStockNum
@@ -565,7 +483,7 @@ public class SummaryServiceImpl implements SummaryService {
         BigDecimal strategyDelta = stockDelta.add(optionsDelta.multiply(lotSize));
         summary.setStrategyDelta(strategyDelta);
 
-        // avgDelta 未持股直接取期权整体Delta 否则取策略总Delta/持股数
+        // 策略平均每股Delta avgDelta 未持股直接取期权整体Delta 否则取策略总Delta/持股数
         BigDecimal avgDelta = BigDecimal.ZERO;
         if (holdStockNum != 0) {
             BigDecimal holdStockNumBigDecimal = BigDecimal.valueOf(holdStockNum);
@@ -601,53 +519,22 @@ public class SummaryServiceImpl implements SummaryService {
         // 未平仓订单处理策略
         OrderTradeStrategy defaultOrderTradeStrategy = new DefaultTradeStrategy(summary);
         for (OwnerOrder order : allOpenOptionsOrder) {
-
-            // 查询未平仓订单可以Roll的期权实时数据
-            // 查询股票期权到期日
-            Security currentSecurity = Security.of(order.getUnderlyingCode(), order.getMarket());
-            List<OptionsStrikeDate> optionsStrikeDates = optionsQueryManager.queryOptionsExpDate(order.getUnderlyingCode(),
-                    order.getMarket());
-            List<Options> allExistsOptions = new ArrayList<>();
-            List<Security> optionsSecurityList = new ArrayList<>();
-            optionsSecurityList.add(Security.of(order.getCode(), order.getMarket()));
-            LocalDate weekStrikeDate = getNextWeekOptionsStrikeDate(optionsStrikeDates, order);
-            if (null != weekStrikeDate) {
-                List<Security> weekOptionsSecurityList = getRollOptionsSecurity(order, weekStrikeDate);
-                optionsSecurityList.addAll(weekOptionsSecurityList);
-                allExistsOptions.addAll(optionsQueryManager.queryAllOptions(currentSecurity, weekStrikeDate.toString()));
-            }
-            LocalDate monthStrikeDate = getNextMonthOptionsStrikeDate(optionsStrikeDates, order);
-            if (null != monthStrikeDate) {
-                List<Security> monthOptionsSecurityList = getRollOptionsSecurity(order, monthStrikeDate);
-                optionsSecurityList.addAll(monthOptionsSecurityList);
-                allExistsOptions.addAll(optionsQueryManager.queryAllOptions(currentSecurity, monthStrikeDate.toString()));
-            }
-            // 过滤存在的期权
-            optionsSecurityList = filterExistsOptions(optionsSecurityList, allExistsOptions);
-
-            List<OptionsRealtimeData> optionsRealtimeDataList = optionsQueryManager
-                    .queryOptionsRealtimeData(optionsSecurityList);
-            order.setExtValue(OrderExt.ROLL_OPTIONS, optionsRealtimeDataList);
-            CandlestickPeriod klinePeriod = me.dingtou.options.util.AccountExtUtils.getKlinePeriod(account);
-            StockIndicator stockIndicator = indicatorManager.calculateStockIndicator(account, security, klinePeriod, 30);
-            defaultOrderTradeStrategy.calculate(account, order, stockIndicator);
+            defaultOrderTradeStrategy.calculate(account, order);
         }
 
-        return summary;
-    }
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("请帮我对策略：").append(ownerStrategy.getStrategyName()).append(" 进行综合分析。\n")
+                .append("策略ID：").append(ownerStrategy.getStrategyId())
+                .append("，期权策略Code：").append(ownerStrategy.getStrategyCode())
+                .append("，期权策略：").append(optionsStrategy.getTitle())
+                .append("，策略整体Delta：").append(summary.getStrategyDelta())
+                .append("，策略平均每股Delta：").append(summary.getAvgDelta())
+                .append("，请按照期权策略规则、期权策略详情和订单，以及其他你评估需要的信息，给我一些交易建议。");
 
-    /**
-     * 过滤真实存在的标的
-     * 
-     * @param optionsSecurityList 期权标的
-     * @param allExistsOptions    真实存在的
-     * @return
-     */
-    private List<Security> filterExistsOptions(List<Security> optionsSecurityList, List<Options> allExistsOptions) {
-        return optionsSecurityList.stream()
-                .filter(security -> allExistsOptions.stream()
-                        .anyMatch(option -> option.getBasic().getSecurity().getCode().equals(security.getCode())))
-                .collect(Collectors.toList());
+        // 生成策略分析提示词
+        summary.setStrategyPrompt(prompt.toString());
+
+        return summary;
     }
 
 }

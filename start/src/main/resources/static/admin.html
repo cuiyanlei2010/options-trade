@@ -210,6 +210,12 @@
                 <form class="layui-form" id="knowledgeForm" lay-filter="knowledgeForm" style="padding: 20px;">
                     <input type="hidden" name="id">
                     <div class="layui-form-item">
+                        <label class="layui-form-label">编码</label>
+                        <div class="layui-input-block">
+                            <input type="text" name="code" required lay-verify="required" placeholder="请输入编码" autocomplete="off" class="layui-input">
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
                         <label class="layui-form-label">标题</label>
                         <div class="layui-input-block">
                             <input type="text" name="title" required lay-verify="required" placeholder="请输入标题" autocomplete="off" class="layui-input">
@@ -274,10 +280,7 @@
                 <label class="layui-form-label">策略代码</label>
                 <div class="layui-input-block">
                     <select name="strategyCode" lay-verify="required" lay-filter="strategyCode">
-                        <option value="">请选择策略代码</option>
-                        <option value="default">默认策略</option>
-                        <option value="wheel_strategy">车轮策略</option>
-                        <option value="cc_strategy">CC策略</option>
+                        <option value="">请在【知识库管理】添加期权策略知识</option>
                     </select>
                 </div>
             </div>

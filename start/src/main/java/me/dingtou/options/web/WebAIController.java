@@ -16,6 +16,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
@@ -109,7 +110,7 @@ public class WebAIController {
                                 escapeHtml(msg);
                                 connect.send(msg);
                             } catch (IOException e) {
-                                log.error("send message error", e);
+                                log.error("send message error:", e.getMessage());
                             }
                             return null;
                         }, msg -> {
@@ -117,7 +118,7 @@ public class WebAIController {
                                 escapeHtml(msg);
                                 connect.send(msg);
                             } catch (IOException e) {
-                                log.error("send message error", e);
+                                log.error("send message error:", e.getMessage());
                             }
                             return null;
                         });
@@ -164,7 +165,7 @@ public class WebAIController {
                                 escapeHtml(msg);
                                 connect.send(msg);
                             } catch (IOException e) {
-                                log.error("send message error", e);
+                                log.error("send message error:", e.getMessage());
                             }
                             return null;
                         }, msg -> {
@@ -172,7 +173,7 @@ public class WebAIController {
                                 escapeHtml(msg);
                                 connect.send(msg);
                             } catch (IOException e) {
-                                log.error("send message error", e);
+                                log.error("send message error:", e.getMessage());
                             }
                             return null;
                         });
@@ -217,6 +218,12 @@ public class WebAIController {
         try {
             String owner = SessionUtils.getCurrentOwner();
             List<OwnerChatRecord> records = assistantService.listRecordsBySessionId(owner, sessionId);
+            if (records == null || records.isEmpty()) {
+                return WebResult.success(Collections.emptyList());
+            }
+
+            // 屏蔽系统消息
+            records.removeIf(e -> "system".equals(e.getRole()));
 
             // 如果是agent模式的第一条助手消息，提取task标签内容
             boolean isFirstUserMessage = true;

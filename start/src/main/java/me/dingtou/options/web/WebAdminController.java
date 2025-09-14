@@ -180,4 +180,29 @@ public class WebAdminController {
         boolean result = adminService.updateKnowledgeStatus(id, status);
         return WebResult.success(result);
     }
+    
+    /**
+     * 物理删除知识库
+     *
+     * @param id 知识库ID
+     * @return 是否删除成功
+     */
+    @RequestMapping(value = "/knowledge/delete", method = RequestMethod.POST)
+    public WebResult<Boolean> deleteKnowledge(@RequestParam("id") Long id) {
+        boolean result = adminService.deleteKnowledge(id);
+        return WebResult.success(result);
+    }
+    
+    /**
+     * 根据类型查询知识库
+     *
+     * @param type 类型
+     * @return 知识库列表
+     */
+    @RequestMapping(value = "/knowledge/listByType", method = RequestMethod.GET)
+    public WebResult<List<OwnerKnowledge>> listKnowledgesByType(@RequestParam("type") Integer type) {
+        String owner = SessionUtils.getCurrentOwner();
+        List<OwnerKnowledge> knowledges = adminService.listKnowledgesByType(owner, type);
+        return WebResult.success(knowledges);
+    }
 }

@@ -2,8 +2,11 @@
 
 ## 策略信息
 - 策略ID: ${strategySummary.strategy.strategyId!''}
+- 期权策略Code: ${ strategySummary.strategy.strategyCode!'' }
+- 期权策略: ${strategySummary.getOptionsStrategy().getTitle() }
 - 策略名称: ${strategySummary.strategy.strategyName!''}
-- 策略Delta: ${strategySummary.strategyDelta!''} (看多比例:${strategySummary.avgDelta!''})
+- 策略整体Delta: ${strategySummary.strategyDelta!''}
+- 策略平均每股Delta: ${strategySummary.avgDelta!''}
 - 策略盈利: $${strategySummary.allIncome!''}
 - 期权盈利: $${strategySummary.allOptionsIncome!''}
 - 持有股票: ${strategySummary.holdStockNum!''}
@@ -24,4 +27,10 @@
 </#list>
 <#else>
 暂无订单
+</#if>
+
+<#if includeStrategyRule?? && includeStrategyRule>
+## ${strategySummary.getOptionsStrategy().getTitle() }规则
+
+${strategySummary.getOptionsStrategy().getContent()}
 </#if>

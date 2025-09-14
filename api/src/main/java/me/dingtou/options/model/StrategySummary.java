@@ -20,6 +20,11 @@ public class StrategySummary {
     private OwnerStrategy strategy;
 
     /**
+     * 期权策略知识
+     */
+    private OwnerKnowledge optionsStrategy;
+
+    /**
      * 策略总体Delta
      */
     private BigDecimal strategyDelta;
@@ -45,7 +50,7 @@ public class StrategySummary {
     private BigDecimal openOptionsQuantity;
 
     /**
-     * 平均Delta
+     * 策略平均每股Delta
      */
     private BigDecimal avgDelta;
 
@@ -119,4 +124,8 @@ public class StrategySummary {
      */
     private Map<String, OwnerOrderGroup> orderGroups;
 
+    /**
+     * 策略分析提示词
+     */
+    private String strategyPrompt;
 }

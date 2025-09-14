@@ -1,6 +1,7 @@
 package me.dingtou.options.manager;
 
 import me.dingtou.options.constant.CandlestickPeriod;
+import me.dingtou.options.constant.OptionsFilterType;
 import me.dingtou.options.gateway.OptionsChainGateway;
 import me.dingtou.options.model.*;
 import me.dingtou.options.util.AccountExtUtils;
@@ -37,30 +38,21 @@ public class OptionsQueryManager {
     }
 
     /**
-     * 查询期权标的
-     * 
-     * @param security   股票
-     * @param strikeDate 期权到期日
-     * @return
-     */
-    public List<Options> queryAllOptions(Security security, String strikeDate) {
-        return optionsChainGateway.queryAllOptions(security, strikeDate);
-    }
-
-    /**
      * 查询期权链
      * 
      * @param ownerAccount     账户
      * @param security         股票
      * @param strikeDate       期权到期日
      * @param includeIndicator 是否包含技术指标
+     * @param filterType       过滤条件
      * 
      * @return 期权链
      */
     public OptionsChain queryOptionsChain(OwnerAccount ownerAccount,
             Security security,
             String strikeDate,
-            boolean includeIndicator) {
+            boolean includeIndicator,
+            OptionsFilterType filterType) {
         if (null == security || null == strikeDate) {
             return null;
         }
@@ -83,7 +75,8 @@ public class OptionsQueryManager {
         // 期权链
         OptionsChain optionsChain = optionsChainGateway.queryOptionsChain(security,
                 strikeDate,
-                lastDone);
+                lastDone,
+                filterType);
         optionsChain.setStockIndicator(stockIndicator);
         optionsChain.setVixIndicator(vixIndicator);
 

@@ -78,4 +78,25 @@ public class KnowledgeManager {
         return ownerKnowledgeDAO.update(null, updateWrapper) > 0;
     }
 
+    /**
+     * 物理删除知识库
+     *
+     * @param id ID
+     * @return 是否删除成功
+     */
+    public boolean deleteKnowledge(Long id) {
+        return ownerKnowledgeDAO.deleteById(id) > 0;
+    }
+
+    /**
+     * 根据所有者和编码查询知识库
+     *
+     * @param owner 所有者
+     * @param code  编码
+     * @return 知识库
+     */
+    public OwnerKnowledge getKnowledgeByOwnerAndCode(String owner, String code) {
+        return ownerKnowledgeDAO.queryByOwnerAndCode(owner, code);
+    }
+
 }

@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 
 import com.alibaba.fastjson2.JSON;
 
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.UserMessage;
@@ -92,10 +93,14 @@ public class AgentCopilotServiceV2Impl implements CopilotService {
         initMcpServer(account);
 
         // 构建包含MCP工具描述的系统提示词
-        String firstMessage = buildSystemPrompt(account, ownerCode, message.getContent());
-        Message agentMessage = new Message("user", firstMessage);
+        String sysMsg = buildSystemPrompt(account, ownerCode);
+        Message systemMessage = new Message("system", sysMsg);
+        saveChatRecord(owner, sessionId, title, systemMessage);
 
-        work(account, title, agentMessage, callback, failCallback, sessionId, new ArrayList<>());
+        String userMsg = buildContinuePrompt(owner, ownerCode, message.getContent());
+        Message userMessage = new Message("user", userMsg);
+
+        work(account, title, userMessage, callback, failCallback, sessionId, List.of(systemMessage));
 
         return sessionId;
     }
@@ -179,7 +184,7 @@ public class AgentCopilotServiceV2Impl implements CopilotService {
             List<Message> historyMessages) {
 
         // 最大循环次数防止无限循环
-        int maxIterations = 10;
+        int maxIterations = 15;
         int iteration = 0;
 
         List<ChatMessage> chatMessages = LlmUtils.convertMessage(historyMessages);
@@ -189,17 +194,19 @@ public class AgentCopilotServiceV2Impl implements CopilotService {
         saveChatRecord(owner, sessionId, title, newMessage);
         chatMessages.add(LlmUtils.convertMessage(newMessage));
 
-        StreamingChatModel chatModel = LlmUtils.buildChatModel(account, false);
-        StreamingChatModel summaryModel = LlmUtils.buildChatModel(account, true);
+        StreamingChatModel chatModel = LlmUtils.buildStreamingChatModel(account, false);
+        StreamingChatModel summaryModel = LlmUtils.buildStreamingChatModel(account, true);
         final StringBuffer finalResponse = new StringBuffer();
         // 是否需要切换summary模型
         final AtomicBoolean needSummary = new AtomicBoolean(false);
         while (iteration++ < maxIterations && finalResponse.isEmpty()) {
             final StringBuffer returnMessage = new StringBuffer();
+            final StringBuffer reasoningMessage = new StringBuffer();
             String messageId = "assistant" + System.currentTimeMillis();
             final CountDownLatch latch = new CountDownLatch(1);
             // 切换模型
             StreamingChatModel model = needSummary.get() && null != summaryModel ? summaryModel : chatModel;
+            log.info("Title: {}  current iteration: {}  chatMessages size: {}", title, iteration, chatMessages.size());
             model.chat(chatMessages, new StreamingChatResponseHandler() {
                 @Override
                 public void onPartialResponse(String partialResponse) {
@@ -209,6 +216,7 @@ public class AgentCopilotServiceV2Impl implements CopilotService {
 
                 @Override
                 public void onPartialThinking(PartialThinking partialThinking) {
+                    reasoningMessage.append(partialThinking.text());
                     Message thinkingMessage = new Message();
                     thinkingMessage.setMessageId(messageId);
                     thinkingMessage.setRole("assistant");
@@ -219,9 +227,20 @@ public class AgentCopilotServiceV2Impl implements CopilotService {
                 @Override
                 public void onCompleteResponse(ChatResponse completeResponse) {
                     // 保存模型回复
-                    final String finalMsg = returnMessage.toString();
+                    String finalMsg = returnMessage.toString();
+
+                    if (StringUtils.isBlank(finalMsg) && completeResponse.aiMessage().hasToolExecutionRequests()) {
+                        finalMsg = convertToolCall(completeResponse.aiMessage().toolExecutionRequests());
+                        // returnMessage 为空时客户端未收到任何命令，此时直接输出工具调用请求
+                        callback.apply(new Message(messageId, "assistant", finalMsg));
+                        log.info("hasToolExecutionRequests finalMsg: {}", finalMsg);
+                    }
+
                     Message assistantMessage = new Message("assistant", finalMsg);
                     assistantMessage.setMessageId(messageId);
+                    if (!reasoningMessage.isEmpty()) {
+                        assistantMessage.setReasoningContent(reasoningMessage.toString());
+                    }
                     saveChatRecord(owner, sessionId, title, assistantMessage);
                     chatMessages.add(new AiMessage(finalMsg));
 
@@ -233,27 +252,34 @@ public class AgentCopilotServiceV2Impl implements CopilotService {
                         latch.countDown();
                         return;
                     }
-                    List<ToolCallRequest> toolCalls = toolProcesser.parseToolRequest(owner, finalMsg);
-                    if (toolCalls == null || toolCalls.isEmpty()) {
-                        // 没有工具调用，也返回最终结果
-                        finalResponse.append(finalMsg);
-                        latch.countDown();
-                        return;
-                    }
 
                     // 调用工具
                     StringBuffer toolResultPrompt = new StringBuffer();
-                    for (ToolCallRequest toolCall : toolCalls) {
-                        String toolResult = null;
-                        if (toolCall.isSummary()) {
-                            needSummary.set(true);
-                            toolResult = "Yes";
-                        } else {
-                            // 调用MCP服务
-                            toolResult = toolProcesser.callTool(toolCall);
+                    try {
+                        List<ToolCallRequest> toolCalls = toolProcesser.parseToolRequest(owner, finalMsg);
+                        if (toolCalls == null || toolCalls.isEmpty()) {
+                            // 没有工具调用，也返回最终结果
+                            finalResponse.append(finalMsg);
+                            latch.countDown();
+                            return;
                         }
-                        // 构建工具调用结果提示
-                        toolResultPrompt.append(toolProcesser.buildResultPrompt(toolCall, toolResult));
+
+                        for (ToolCallRequest toolCall : toolCalls) {
+                            String toolResult = null;
+                            if (ToolCallRequest.SUMMARY_TOOL.equals(toolCall.getName())) {
+                                needSummary.set(true);
+                                toolResult = "Yes";
+                            } else {
+                                // 调用MCP服务
+                                toolResult = toolProcesser.callTool(toolCall);
+                            }
+                            // 构建工具调用结果提示
+                            toolResultPrompt.append(toolProcesser.buildResultPrompt(toolCall, toolResult));
+                        }
+                    } catch (Exception e) {
+                        log.error("ToolProcesser error: {}", e.getMessage(), e);
+                        // 工具调用异常也反馈给模型
+                        toolResultPrompt.append(e.getMessage());
                     }
 
                     // 保存工具调用结果
@@ -265,6 +291,22 @@ public class AgentCopilotServiceV2Impl implements CopilotService {
                     // 将MCP结果提交给大模型继续处理
                     latch.countDown();
                     return;
+                }
+
+                @SuppressWarnings({ "unchecked", "rawtypes" })
+                private String convertToolCall(List<ToolExecutionRequest> toolExecutionRequests) {
+                    if (null == toolExecutionRequests || toolExecutionRequests.isEmpty()) {
+                        return "<tool_call>[]</tool_call>";
+                    }
+                    List<ToolCallRequest> callRequests = new ArrayList<>();
+                    for (ToolExecutionRequest toolExecutionRequest : toolExecutionRequests) {
+                        String name = toolExecutionRequest.name();
+                        String args = toolExecutionRequest.arguments();
+                        Map argsMap = com.alibaba.fastjson2.JSON.parseObject(args, Map.class);
+                        ToolCallRequest callReq = new ToolCallRequest(name, argsMap);
+                        callRequests.add(callReq);
+                    }
+                    return String.format("<tool_call>%s</tool_call>", JSON.toJSONString(callRequests));
                 }
 
                 @Override
@@ -303,7 +345,7 @@ public class AgentCopilotServiceV2Impl implements CopilotService {
                 title,
                 message.getRole(),
                 message.getContent(),
-                "");
+                message.getReasoningContent());
         record.setMessageId(message.getMessageId());
         assistantService.addChatRecord(owner, sessionId, record);
     }
@@ -331,12 +373,10 @@ public class AgentCopilotServiceV2Impl implements CopilotService {
      * 
      * @param account   账户
      * @param ownerCode 账户编码
-     * @param content   内容
      * @return 系统Prompt
      */
-    private String buildSystemPrompt(OwnerAccount account, String ownerCode, String content) {
+    private String buildSystemPrompt(OwnerAccount account, String ownerCode) {
         Map<String, Object> data = new HashMap<>();
-        data.put("task", content);
         data.put("ownerCode", ownerCode);
         data.put("time", DateUtils.currentTime());
 
