@@ -23,8 +23,9 @@ public enum AccountExt {
     AI_SUMMARY_API_MODEL("ai_summary_api_model", "AI模型名称（总结）", "text", 231),
     AI_SUMMARY_API_KEY("ai_summary_api_key", "AI接口Key（总结）", "text", 232),
     AI_SUMMARY_API_TEMPERATURE("ai_summary_api_temperature", "AI温度参数（总结）", "text", 233),
+    AI_SUMMARY_RESULT("ai_summary_result", "AI总结返回提示词", "text", 235),
 
-    AI_USE_SYSTEM_STRATEGIES("ai_use_system_strategies", "是否使用系统策略(Y/N)", "text", 250),
+    //AI_USE_SYSTEM_STRATEGIES("ai_use_system_strategies", "是否使用系统策略(Y/N 已经强制Y)", "text", 250),
 
     // 分析配置
     KLINE_PERIOD("kline_period", "K线周期DAY/WEEK", "text", 300),

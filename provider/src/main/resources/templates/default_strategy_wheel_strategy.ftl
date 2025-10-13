@@ -1,7 +1,3 @@
-<strategy>
-<strategy_name>车轮策略 (Wheel Strategy)</strategy_name>
-<strategy_description>只有当用户选择“车轮策略”时生效。</strategy_description>
-<strategy_content>
 一、 第1阶段：确认股票趋势
     * 必须向上趋势，否则暂停交易
 
@@ -50,48 +46,3 @@
 五、 附加信息
 * 车轮策略中的看跌期权：关于期权delta绝对值，通常保持在 0.10 - 0.35 的范围内;
 * 车轮策略中的看涨期权：不关注看涨期权的delta，通常使用购买价格或指派价格作为行权价;
-</strategy_content>
-</strategy>
-<strategy>
-<strategy_name>备兑看涨策略 (Covered Call)</strategy_name>
-<strategy_description>只有当用户选择“备兑看涨策略”时生效。</strategy_description>
-<strategy_content>
-一、 开仓规则
-（注：策略未持有有效期权订单时，使用开仓规则。）
-➦ **开仓期权delta**：开仓期权delta绝对值选择在 0.25 - 0.45 的范围内;
-➦ **到期日选择**：选择2-5周的期权，优先选择月度期权（每个月第三周的期权）；
-
-二、 Covered Call 策略delta监控
-- **策略delta说明**：指策略平均每股delta
-- **目标区间**：0.25 ≤ Delta ≤ 0.75 
-- **超出区间** → 触发调整
-
-三、 调整规则
-（注：策略持有有效期权订单，并且平均每股delta不在0.25到0.75之间时，才触发调整规则。）
-1. 短周期（到期前 2-3周内）
-  ➠ 首选操作：
-  • 滚动至下月平价期权（ATM）。
-
-  ➠ 次选操作（按delta动态调整）：
-  • 当 Delta > 0.5：降低 Delta 0.1（例如 0.6 → 0.5）。
-  • 当 Delta < 0.5：提高 Delta 0.1（例如 0.4 → 0.5）。  
-    
-2. 中周期（到期时间 3个月内）  
-  ➠ 通用规则：
-  • 无论delta数值如何，强制滚动至下一到期月的合约。
-
-  ➠ 特殊匹配规则：
-  • 若当前 delta = 0.75 → 选择下月合约 delta = 0.50
-  • 目标delta：0.50
-  • 若当前 delta = 0.25 → 选择下月合约 delta = 0.40
-  • 目标Delta：0.40
-    
-3. 长周期（到期时间 > 3个月）  
-  ➠ 条件：delta ≥ 0.75
-  • 操作：滚动至同到期日的期权合约
-  • 目标delta：0.50
-  ➠ 条件：Delta ≤ 0.25
-  • 操作：滚动至同到期日的期权合约
-  • 目标delta：0.40
-</strategy_content>
-</strategy>

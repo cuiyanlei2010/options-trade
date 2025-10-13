@@ -155,6 +155,19 @@ public class AccountExtUtils {
     }
 
     /**
+     * 获取AI总结返回提示词
+     *
+     * @param account 账户对象
+     * @return AI总结返回提示词
+     */
+    public static String getSummaryResult(OwnerAccount account) {
+        if (account == null) {
+            return "严格按照交易规则进行综合分析和总结";
+        }
+        return account.getExtValue(AccountExt.AI_SUMMARY_RESULT, "严格按照交易规则进行综合分析和总结");
+    }
+
+    /**
      * 获取MCP服务器配置
      *
      * @param account 账户对象
@@ -165,19 +178,6 @@ public class AccountExtUtils {
             return null;
         }
         return account.getExtValue(AccountExt.AI_MCP_SETTINGS, null);
-    }
-
-    /**
-     * 获取是否使用系统策略
-     *
-     * @param account 账户对象
-     * @return 是否使用系统策略
-     */
-    public static boolean getUseSystemStrategies(OwnerAccount account) {
-        if (account == null) {
-            return false;
-        }
-        return "Y".equals(account.getExtValue(AccountExt.AI_USE_SYSTEM_STRATEGIES, "Y"));
     }
 
     /**

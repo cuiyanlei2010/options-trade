@@ -268,7 +268,7 @@ public class AgentCopilotServiceV2Impl implements CopilotService {
                             String toolResult = null;
                             if (ToolCallRequest.SUMMARY_TOOL.equals(toolCall.getName())) {
                                 needSummary.set(true);
-                                toolResult = "Yes";
+                                toolResult = AccountExtUtils.getSummaryResult(account);
                             } else {
                                 // 调用MCP服务
                                 toolResult = toolProcesser.callTool(toolCall);
@@ -405,9 +405,6 @@ public class AgentCopilotServiceV2Impl implements CopilotService {
             }
             data.put("servers", servers);
         }
-
-        // 是否使用系统策略
-        data.put("useSystemStrategies", AccountExtUtils.getUseSystemStrategies(account));
 
         List<OwnerKnowledge> knowledges = knowledgeManager.listKnowledges(owner);
         if (null != knowledges && !knowledges.isEmpty()) {
