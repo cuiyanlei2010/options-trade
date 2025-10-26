@@ -23,9 +23,9 @@ public class KnowledgeMcpService {
     @Autowired
     private KnowledgeManager knowledgeManager;
 
-    @Tool(description = "根据期权策略Code查询期权策略规则。期权策略规则包含期权交易的具体要求和规则，例如：delta要求、行权日期选择要求、技术指标要求等，是咨询期权策略时必须依赖的重要信息。（指定期权策略Code时查询指定的期权策略规则详情，不指定时查询所有期权策略规则。）")
+    @Tool(description = "查询期权交易策略规则。策略规则包含具体的交易规则、delta要求、行权日期选择要求、技术指标要求等详细信息。当指定strategyCode参数时，返回指定策略的详细规则；不指定时，返回所有可用策略的规则列表。")
     public String queryStrategyRule(@ToolParam(required = true, description = "用户Token") String ownerCode,
-            @ToolParam(required = false, description = "期权策略Code") String strategyCode) {
+            @ToolParam(required = false, description = "期权策略编码，可选值：cc_strategy(备兑看涨策略)、wheel_strategy(车轮策略)、default(默认卖期权策略)。不指定时返回所有策略") String strategyCode) {
         String owner = authService.decodeOwner(ownerCode);
         if (null == owner) {
             return "用户编码信息不正确或已经过期";

@@ -131,6 +131,16 @@
             <groupId>com.google.adk</groupId>
             <artifactId>google-adk-dev</artifactId>
         </dependency>
+        
+        <!-- 邮件发送相关依赖 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.commonmark</groupId>
+            <artifactId>commonmark</artifactId>
+        </dependency>
 
     </dependencies>
 

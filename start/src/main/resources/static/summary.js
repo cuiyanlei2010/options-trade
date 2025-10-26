@@ -53,6 +53,7 @@ function renderPositionTable(positions){
             cols: [[
                 {field: 'securityCode', title: '代码', width: 220},
                 {field: 'securityName', title: '名称', width: 360},
+                {field: 'market', title: '市场', width: 80},
                 {field: 'quantity', title: '持仓数量', width: 120},
                 {field: 'canSellQty', title: '可卖数量', width: 120},
                 {field: 'costPrice', title: '成本价', width: 120},
@@ -165,7 +166,7 @@ function renderOrderTable(orderList){
               }
               return '';
           }},
-          {field: 'strategyName', title: '策略｜Delta', width: 180, templet: function(d){
+          {field: 'strategyName', title: '策略｜Delta', width: 200, templet: function(d){
               if (d.ext && d.ext.strategyName && d.ext.strategyId && d.ext.strategyAvgDelta) {
                   return `<a href="javascript:void(0);" class="strategy-link table-link" data-strategy-id="${d.ext.strategyId}">${d.ext.strategyName}｜${d.ext.strategyAvgDelta}</a>`;
               }

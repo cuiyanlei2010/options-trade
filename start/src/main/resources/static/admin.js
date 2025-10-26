@@ -17,7 +17,7 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                 type: 'GET',
                 success: function (res) {
                     if (res.success) {
-                        var securityList = res.data;
+                        var securityList = res.data.data;
                         var securitySelect = $(selectElementId);
                         securitySelect.empty();
                         securitySelect.append('<option value="">请选择标的代码</option>');
@@ -46,7 +46,7 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                 type: 'GET',
                 success: function (res) {
                     if (res.success) {
-                        var strategyList = res.data;
+                        var strategyList = res.data.data;
                         var strategySelect = $('select[name="strategyCode"]');
                         strategySelect.empty();
                         strategySelect.append('<option value="">请在【知识库管理】添加期权策略知识</option>');
@@ -91,6 +91,12 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                 if (data.ext.initial_stock_cost) {
                     $('input[name="initialStockCost"]').val(data.ext.initial_stock_cost);
                 }
+                // 设置是否需要策略诊断选项
+                if (data.ext.need_evaluate !== undefined) {
+                    // 对于radio按钮，需要设置checked属性而不是val
+                    const needEvaluateValue = data.ext.need_evaluate.toString();
+                    $(`input[name="need_evaluate"][value="${needEvaluateValue}"]`).prop('checked', true);
+                }
             }
         },
 
@@ -122,10 +128,16 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                 formData.ext.initial_stock_cost = formData.initialStockCost;
             }
 
+            // 处理诊断选项
+            if (formData.need_evaluate !== undefined) {
+                formData.ext.need_evaluate = formData.need_evaluate === 'true' || formData.need_evaluate === true;
+            }
+
             // 删除临时字段
             delete formData.sellPutStrikePrice;
             delete formData.initialStockNum;
             delete formData.initialStockCost;
+            delete formData.need_evaluate;
 
             return formData;
         },
@@ -169,6 +181,8 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                         form.val('strategyForm', data);
                         CommonUtils.processExtData(data);
                         CommonUtils.toggleStrategyConfig(data.strategyCode);
+                        // 重新渲染表单以确保radio按钮状态正确显示
+                        form.render('radio');
                     } else {
                         // 新增模式：默认隐藏车轮策略配置
                         $('#wheelStrategyConfig').hide();
@@ -201,6 +215,12 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
         elem: '#securityTable',
         url: '/admin/security/list',
         page: true,
+        limit: 50,
+        limits: [10, 20, 50],
+        request: {
+            pageName: 'page',
+            limitName: 'size'
+        },
         toolbar: true,
         defaultToolbar: ['filter', 'exports', 'print'],
         cols: [[
@@ -232,8 +252,8 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
             return {
                 "code": res.success ? 0 : 1,
                 "msg": res.message,
-                "count": res.data ? res.data.length : 0,
-                "data": res.data
+                "count": res.data.total,
+                "data": res.data.data || []
             };
         }
     });
@@ -250,6 +270,12 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
             elem: '#strategyTable',
             url: '/admin/strategy/list',
             page: true,
+            limit: 50,
+            limits: [10, 20, 50],
+            request: {
+                pageName: 'page',
+                limitName: 'size'
+            },
             toolbar: true,
             defaultToolbar: ['filter', 'exports', 'print'],
             cols: [[
@@ -260,6 +286,15 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                 {field: 'stage', title: '策略阶段', width: 100},
                 {field: 'code', title: '标的代码', width: 100},
                 {field: 'lotSize', title: '合约股数', width: 100},
+                {
+                    field: 'need_evaluate', title: '需要评估', width: 100, templet: function(d) {
+                        if (d.ext && d.ext.need_evaluate == "true") {
+                            return '<span class="layui-badge layui-bg-green">是</span>';
+                        } else {
+                            return '<span class="layui-badge layui-bg-gray">否</span>';
+                        }
+                    }
+                },
                 {
                     field: 'startTime', title: '开始时间', width: 180, sort: true,
                     templet: function (d) {
@@ -300,8 +335,8 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                 return {
                     "code": res.success ? 0 : 1,
                     "msg": res.message,
-                    "count": res.data ? res.data.length : 0,
-                    "data": res.data
+                    "count": res.data.total,
+                    "data": res.data.data || []
                 };
             }
         });
@@ -313,6 +348,12 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
             elem: '#accountTable',
             url: '/admin/account/list',
             page: true,
+            limit: 50,
+            limits: [10, 20, 50],
+            request: {
+                pageName: 'page',
+                limitName: 'size'
+            },
             toolbar: true,
             defaultToolbar: ['filter', 'exports', 'print'],
             cols: [[
@@ -336,8 +377,8 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
                 return {
                     "code": res.success ? 0 : 1,
                     "msg": res.message,
-                    "count": res.data ? res.data.length : 0,
-                    "data": res.data
+                    "count": res.data.total,
+                    "data": res.data.data || []
                 };
             }
         });
@@ -892,7 +933,7 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
             {fixed: 'right', title: '操作', toolbar: '#knowledgeTableBar', width: 200}
         ]],
         page: true,
-        limit: 10,
+        limit: 50,
         limits: [10, 20, 50],
         request: {
             pageName: 'page',
@@ -905,8 +946,8 @@ layui.use(['table', 'form', 'layer', 'util', 'element'], function () {
             return {
                 "code": res.success ? 0 : 1,
                 "msg": res.message,
-                "count": res.data ? res.data.length : 0,
-                "data": res.data
+                "count": res.data.total,
+                "data": res.data.data || []
             };
         }
     });
